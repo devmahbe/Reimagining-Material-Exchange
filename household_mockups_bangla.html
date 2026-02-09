@@ -1,0 +1,2148 @@
+<!DOCTYPE html>
+<html lang="bn">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=375, initial-scale=1.0">
+    <title>ভাঙ্গারি এক্সচেঞ্জ - পরিবার মকআপ</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2E7D32;
+            --primary-light: #4CAF50;
+            --secondary: #FF8F00;
+            --secondary-light: #FFB74D;
+            --bg-cream: #FFF8E1;
+            --bg-white: #FFFFFF;
+            --text-dark: #212121;
+            --text-gray: #757575;
+            --text-light: #9E9E9E;
+            --border: #E0E0E0;
+            --success: #4CAF50;
+            --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.15);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: white;
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 20px;
+        }
+
+        /* Language Toggle */
+        .lang-toggle-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 30px;
+            gap: 15px;
+        }
+
+        .lang-toggle {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            padding: 4px;
+            display: flex;
+            gap: 4px;
+            backdrop-filter: blur(10px);
+        }
+
+        .lang-option {
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: rgba(255, 255, 255, 0.7);
+            border: none;
+            background: transparent;
+        }
+
+        .lang-option.active {
+            background: white;
+            color: var(--primary);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .lang-option:hover:not(.active) {
+            color: white;
+        }
+
+        .section-title {
+            text-align: center;
+            color: white;
+            font-size: 1.5rem;
+            margin: 40px 0 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .mockup-grid {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 30px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .phone-frame {
+            width: 375px;
+            height: 812px;
+            background: #1a1a1a;
+            border-radius: 50px;
+            padding: 20px 15px;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+        }
+
+        .phone-screen {
+            width: 100%;
+            height: 100%;
+            background: var(--bg-cream);
+            border-radius: 35px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .screen-label {
+            text-align: center;
+            color: white;
+            margin-top: 15px;
+            font-weight: 500;
+        }
+
+        /* Status Bar */
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 20px;
+            background: var(--primary);
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* Header */
+        .app-header {
+            background: var(--primary);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .app-header h2 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .app-header .logo {
+            width: 40px;
+            height: 40px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        /* হোম স্ক্রিন */
+        .home-content {
+            padding: 20px;
+        }
+
+        .welcome-card {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            border-radius: 20px;
+            padding: 25px;
+            color: white;
+            margin-bottom: 25px;
+        }
+
+        .welcome-card h3 {
+            font-size: 22px;
+            margin-bottom: 8px;
+        }
+
+        .welcome-card p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .category-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: var(--shadow);
+            transition: transform 0.2s;
+        }
+
+        .category-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .category-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 10px;
+            font-size: 24px;
+        }
+
+        .category-card h4 {
+            font-size: 14px;
+            color: var(--text-dark);
+            margin-bottom: 4px;
+        }
+
+        .category-card .price {
+            font-size: 12px;
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .primary-btn {
+            width: 100%;
+            background: linear-gradient(135deg, var(--secondary) 0%, var(--secondary-light) 100%);
+            color: white;
+            border: none;
+            padding: 18px;
+            border-radius: 16px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 4px 12px rgba(255, 143, 0, 0.3);
+        }
+
+        /* উপাদান নির্বাচন Screen */
+        .material-list {
+            padding: 20px;
+        }
+
+        .material-item {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            box-shadow: var(--shadow);
+        }
+
+        .material-item .icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .material-item .info {
+            flex: 1;
+        }
+
+        .material-item h4 {
+            font-size: 16px;
+            color: var(--text-dark);
+            margin-bottom: 4px;
+        }
+
+        .material-item .rate {
+            font-size: 13px;
+            color: var(--primary);
+        }
+
+        .quantity-control {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .qty-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 2px solid var(--primary);
+            background: transparent;
+            color: var(--primary);
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        .qty-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .qty-value {
+            font-size: 18px;
+            font-weight: 600;
+            min-width: 30px;
+            text-align: center;
+        }
+
+        /* সময়সূচী Screen */
+        .schedule-section {
+            padding: 20px;
+        }
+
+        .date-picker {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+        }
+
+        .date-picker h4 {
+            font-size: 14px;
+            color: var(--text-gray);
+            margin-bottom: 15px;
+        }
+
+        .date-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            text-align: center;
+        }
+
+        .date-grid .day {
+            font-size: 11px;
+            color: var(--text-light);
+            padding: 5px;
+        }
+
+        .date-grid .date {
+            padding: 10px 5px;
+            border-radius: 10px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .date-grid .date.selected {
+            background: var(--primary);
+            color: white;
+        }
+
+        .date-grid .date:hover:not(.selected) {
+            background: var(--bg-cream);
+        }
+
+        .time-slots {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: var(--shadow);
+        }
+
+        .time-slots h4 {
+            font-size: 14px;
+            color: var(--text-gray);
+            margin-bottom: 15px;
+        }
+
+        .slot-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .time-slot {
+            padding: 14px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            text-align: center;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .time-slot.selected {
+            border-color: var(--primary);
+            background: rgba(46, 125, 50, 0.1);
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        /* Confirmation Screen */
+        .confirmation {
+            padding: 20px;
+        }
+
+        .summary-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+        }
+
+        .summary-card h4 {
+            font-size: 14px;
+            color: var(--text-gray);
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            font-size: 14px;
+        }
+
+        .summary-row .label {
+            color: var(--text-gray);
+        }
+
+        .summary-row .value {
+            font-weight: 500;
+            color: var(--text-dark);
+        }
+
+        .price-highlight {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            border-radius: 16px;
+            padding: 20px;
+            color: white;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .price-highlight .label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .price-highlight .amount {
+            font-size: 32px;
+            font-weight: 700;
+            margin-top: 5px;
+        }
+
+        /* Bottom Navigation */
+        .bottom-nav {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            display: flex;
+            justify-content: space-around;
+            padding: 15px 0 25px;
+            border-top: 1px solid var(--border);
+        }
+
+        .nav-item {
+            text-align: center;
+            color: var(--text-light);
+        }
+
+        .nav-item.active {
+            color: var(--primary);
+        }
+
+        .nav-item .icon {
+            font-size: 22px;
+            margin-bottom: 4px;
+        }
+
+        .nav-item .label {
+            font-size: 11px;
+        }
+
+        /* কাগজ Prototypes specific styling */
+        .paper-frame {
+            background: #fff9e6;
+            border: 2px solid #8b7355;
+            padding: 15px;
+            box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
+
+        .paper-frame::before {
+            content: '';
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            right: 5px;
+            bottom: 5px;
+            border: 1px dashed #ccc;
+            border-radius: 5px;
+            pointer-events: none;
+        }
+
+        .paper-content {
+            font-family: 'Comic Sans MS', 'Segoe Script', cursive;
+        }
+
+        .paper-box {
+            border: 2px solid #444;
+            border-radius: 4px;
+            padding: 8px 12px;
+            margin: 8px 0;
+            background: white;
+        }
+
+        .paper-button {
+            background: #e0e0e0;
+            border: 2px solid #333;
+            padding: 8px 15px;
+            margin: 5px;
+            display: inline-block;
+        }
+
+        .paper-arrow {
+            font-size: 28px;
+            text-align: center;
+            color: #666;
+        }
+
+        .paper-note {
+            background: #ffffa5;
+            padding: 5px 10px;
+            transform: rotate(-2deg);
+            font-size: 12px;
+            margin: 5px;
+            display: inline-block;
+        }
+
+        /* ইতিহাস/Past Pickups */
+        .history-item {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: var(--shadow);
+        }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .history-date {
+            font-size: 13px;
+            color: var(--text-gray);
+        }
+
+        .history-status {
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+
+        .status-completed {
+            background: rgba(76, 175, 80, 0.1);
+            color: var(--success);
+        }
+
+        .history-details {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border);
+        }
+
+        .history-materials {
+            font-size: 14px;
+            color: var(--text-dark);
+        }
+
+        .history-earning {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        /* প্রোফাইল Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: var(--shadow);
+        }
+
+        .stat-card .value {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 5px;
+        }
+
+        .stat-card .label {
+            font-size: 13px;
+            color: var(--text-gray);
+        }
+
+        /* Price List */
+        .price-item {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: var(--shadow);
+        }
+
+        .price-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .price-change {
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 12px;
+        }
+
+        .price-up {
+            background: rgba(76, 175, 80, 0.1);
+            color: var(--success);
+        }
+
+        .price-down {
+            background: rgba(244, 67, 54, 0.1);
+            color: #f44336;
+        }
+
+        .scrollable-content {
+            height: 100%;
+            overflow-y: auto;
+            padding-bottom: 80px;
+        }
+
+        /* Authentication Screens */
+        .auth-content {
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .auth-logo {
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 48px;
+        }
+
+        .auth-title {
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 8px;
+        }
+
+        .auth-subtitle {
+            font-size: 14px;
+            color: var(--text-gray);
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-dark);
+            margin-bottom: 8px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            font-size: 15px;
+            transition: all 0.2s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .role-selector {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .role-option {
+            background: white;
+            border: 2px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .role-option.selected {
+            border-color: var(--primary);
+            background: rgba(46, 125, 50, 0.05);
+        }
+
+        .role-option .role-icon {
+            font-size: 40px;
+            margin-bottom: 10px;
+        }
+
+        .role-option .role-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .forgot-password {
+            text-align: right;
+            margin-top: -10px;
+            margin-bottom: 25px;
+        }
+
+        .forgot-password a {
+            font-size: 13px;
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 25px 0;
+            color: var(--text-gray);
+            font-size: 13px;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        .divider::before {
+            margin-right: 15px;
+        }
+
+        .divider::after {
+            margin-left: 15px;
+        }
+
+        .auth-link {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+            color: var(--text-gray);
+        }
+
+        .auth-link a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        /* Messaging */
+        .chat-list {
+            padding: 0 20px;
+        }
+
+        .chat-item {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            box-shadow: var(--shadow);
+            cursor: pointer;
+        }
+
+        .chat-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .chat-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .chat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .chat-name {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .chat-time {
+            font-size: 12px;
+            color: var(--text-light);
+        }
+
+        .chat-preview {
+            font-size: 14px;
+            color: var(--text-gray);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .unread-badge {
+            background: var(--secondary);
+            color: white;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        /* Chat Conversation */
+        .chat-header-bar {
+            background: white;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .message-list {
+            padding: 20px;
+            height: calc(100% - 140px);
+            overflow-y: auto;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .message.sent {
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .message-bubble {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 16px;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .message.received .message-bubble {
+            background: white;
+            color: var(--text-dark);
+            border-bottom-left-radius: 4px;
+        }
+
+        .message.sent .message-bubble {
+            background: var(--primary);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message-time {
+            font-size: 11px;
+            color: var(--text-light);
+            margin-top: 4px;
+            padding: 0 5px;
+        }
+
+        .chat-input-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 15px 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        .chat-input-wrapper {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid var(--border);
+            border-radius: 24px;
+            font-size: 14px;
+            resize: none;
+        }
+
+        .send-btn {
+            width: 44px;
+            height: 44px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🏠 বাসাhold User Mockups</h1>
+    <p class="subtitle">Design Mockups for বাসাhold Material Sellers</p>
+
+    <!-- Language Toggle -->
+    <div class="lang-toggle-container">
+        <div class="lang-toggle">
+            <button class="lang-option active" onclick="setLanguage('en')">English</button>
+            <button class="lang-option" onclick="setLanguage('bn')">বাংলা</button>
+        </div>
+    </div>
+
+    <!-- কাগজের প্রোটোটাইপ বিভাগ -->
+    <h2 class="section-title">📝 কাগজের প্রোটোটাইপ (লো-ফিডেলিটি)</h2>
+
+    <div class="mockup-grid">
+        <!-- কাগজ Prototype: বাসাhold হোম স্ক্রিন -->
+        <div>
+            <div class="phone-frame paper-frame">
+                <div class="phone-screen" style="background: white; padding: 20px;">
+                    <div class="paper-content">
+                        <div
+                            style="text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 15px;">
+                            <strong style="font-size: 16px;">📱 HOME SCREEN</strong>
+                        </div>
+
+                        <div class="paper-box" style="text-align: center;">
+                            <strong>স্বাগতম!</strong><br>
+                            <small>আপনার পুরানো জিনিস বিক্রি করুন</small>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0;">
+                            <div class="paper-box" style="text-align: center;">🍾<br>বোতল<br>৳১৫/kg</div>
+                            <div class="paper-box" style="text-align: center;">📰<br>কাগজ<br>৳১২/kg</div>
+                            <div class="paper-box" style="text-align: center;">🥫<br>ধাতু<br>৳৪০/kg</div>
+                            <div class="paper-box" style="text-align: center;">🛍️<br>প্লাস্টিক<br>৳৮/kg</div>
+                        </div>
+
+                        <div class="paper-button" style="width: 100%; text-align: center; background: #ffa;">
+                            <strong>➕ REQUEST PICKUP</strong>
+                        </div>
+
+                        <div class="paper-arrow">↓</div>
+
+                        <div class="paper-note">ব্যবহারকারী অনুরোধ শুরু করতে ট্যাপ করুন</div>
+
+                        <div style="margin-top: 15px; padding-top: 10px; border-top: 2px dashed #999;">
+                            <div style="display: flex; justify-content: space-around; text-align: center;">
+                                <span>🏠<br><small>হোম</small></span>
+                                <span>📋<br><small>ইতিহাস</small></span>
+                                <span>👤<br><small>প্রোফাইল</small></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <p class="screen-label">হোম স্ক্রিন</p>
+        </div>
+
+        <!-- কাগজ Prototype: উপাদান নির্বাচন -->
+        <div>
+            <div class="phone-frame paper-frame">
+                <div class="phone-screen" style="background: white; padding: 20px;">
+                    <div class="paper-content">
+                        <div
+                            style="text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 15px;">
+                            <strong style="font-size: 16px;">📦 SELECT MATERIALS</strong>
+                        </div>
+
+                        <div style="margin-bottom: 15px;">
+                            <div class="paper-box" style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 24px;">☑️</span>
+                                <div style="flex: 1;">
+                                    <strong>প্লাস্টিক বোতল</strong><br>
+                                    <small>৳১৫/kg</small>
+                                </div>
+                                <div style="display: flex; gap: 5px;">
+                                    <span class="paper-button">−</span>
+                                    <strong>৩</strong>
+                                    <span class="paper-button">+</span>
+                                </div>
+                            </div>
+
+                            <div class="paper-box" style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 24px;">☑️</span>
+                                <div style="flex: 1;">
+                                    <strong>পুরাতন সংবাদপত্র</strong><br>
+                                    <small>৳১২/kg</small>
+                                </div>
+                                <div style="display: flex; gap: 5px;">
+                                    <span class="paper-button">−</span>
+                                    <strong>৫</strong>
+                                    <span class="paper-button">+</span>
+                                </div>
+                            </div>
+
+                            <div class="paper-box" style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 24px;">⬜</span>
+                                <div style="flex: 1;">
+                                    <strong>ধাতুর জিনিস</strong><br>
+                                    <small>৳৪০/kg</small>
+                                </div>
+                                <div style="display: flex; gap: 5px;">
+                                    <span class="paper-button">−</span>
+                                    <strong>০</strong>
+                                    <span class="paper-button">+</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="paper-note" style="margin-bottom: 10px;">Est: ৳১০৫-120</div>
+
+                        <div class="paper-button" style="width: 100%; text-align: center; background: #afa;">
+                            <strong>এগিয়ে যান → সময়সূচী</strong>
+                        </div>
+
+                        <div class="paper-note" style="transform: rotate(1deg);">প্রতিটি আইটেমের জন্য চেকবক্স + পরিমাণ</div>
+                    </div>
+                </div>
+            </div>
+            <p class="screen-label">উপাদান নির্বাচন</p>
+        </div>
+
+        <!-- কাগজ Prototype: সময়সূচী -->
+        <div>
+            <div class="phone-frame paper-frame">
+                <div class="phone-screen" style="background: white; padding: 20px;">
+                    <div class="paper-content">
+                        <div
+                            style="text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 15px;">
+                            <strong style="font-size: 16px;">📅 SCHEDULE PICKUP</strong>
+                        </div>
+
+                        <div class="paper-box">
+                            <strong>তারিখ নির্বাচন করুন:</strong><br>
+                            <div
+                                style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-top: 10px; text-align: center;">
+                                <small>S</small><small>M</small><small>T</small><small>W</small><small>T</small><small>F</small><small>S</small>
+                                <span>19</span><span
+                                    style="background: #4CAF50; color: white; padding: 5px;">20</span><span>21</span><span>22</span><span>23</span><span>24</span><span>25</span>
+                            </div>
+                        </div>
+
+                        <div class="paper-box" style="margin-top: 15px;">
+                            <strong>সময় নির্বাচন করুন:</strong><br>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;">
+                                <div style="border: 2px solid #ccc; padding: 8px; text-align: center;">9-11 AM</div>
+                                <div
+                                    style="border: 2px solid #4CAF50; background: #e8f5e9; padding: 8px; text-align: center;">
+                                    <strong>11-1 PM</strong>
+                                </div>
+                                <div style="border: 2px solid #ccc; padding: 8px; text-align: center;">2-4 PM</div>
+                                <div style="border: 2px solid #ccc; padding: 8px; text-align: center;">4-6 PM</div>
+                            </div>
+                        </div>
+
+                        <div class="paper-button"
+                            style="width: 100%; text-align: center; margin-top: 15px; background: #4caf50; color: white;">
+                            <strong>✓ CONFIRM REQUEST</strong>
+                        </div>
+
+                        <div class="paper-note" style="transform: rotate(2deg);">ব্যবহারকারী সুবিধাজনক সময় বেছে নিন</div>
+                    </div>
+                </div>
+            </div>
+            <p class="screen-label">পিকআপ সময়সূচী</p>
+        </div>
+    </div>
+
+    <!-- হাই-ফিডেলিটি মকআপ -->
+    <h2 class="section-title">🎨 হাই-ফিডেলিটি মকআপ</h2>
+
+    <div class="mockup-grid">
+        <!-- Screen 1: বাসাhold হোম -->
+        <div>
+            <div class="phone-frame">
+                <div class="phone-screen">
+                    <div class="status-bar">
+                        <span>12:57</span>
+                        <span>📶 🔋</span>
+                    </div>
+                    <div class="app-header">
+                        <div class="logo">♻️</div>
+                        <div>
+                            <h2>ভাঙ্গারি এক্সচেঞ্জ</h2>
+                            <small style="opacity: 0.8;">ভাঙ্গারি এক্সচেঞ্জ</small>
+                        </div>
+                    </div>
+                    <div class="home-content">
+                        <div class="welcome-card">
+                            <h3>আবার স্বাগতম! 👋</h3>
+                            <p>আপনার পুরানো জিনিস বিক্রি করুন এবং টাকা কামান</p>
+                        </div>
+
+                        <h4 style="margin-bottom: 15px; color: #757575; font-size: 14px;">আজকের মূল্য</h4>
+
+                        <div class="category-grid">
+                            <div class="category-card">
+                                <div class="category-icon" style="background: #E3F2FD;">🍾</div>
+                                <h4>বোতল</h4>
+                                <p class="price">৳১৫/kg</p>
+                            </div>
+                            <div class="category-card">
+                                <div class="category-icon" style="background: #FFF3E0;">📰</div>
+                                <h4>কাগজ</h4>
+                                <p class="price">৳১২/kg</p>
+                            </div>
+                            <div class="category-card">
+                                <div class="category-icon" style="background: #F3E5F5;">🥫</div>
+                                <h4>ধাতু</h4>
+                                <p class="price">৳৪০/kg</p>
+                            </div>
+                            <div class="category-card">
+                                <div class="category-icon" style="background: #E8F5E9;">🛍️</div>
+                                <h4>প্লাস্টিক</h4>
+                                <p class="price">৳৮/kg</p>
+                            </div>
+                        </div>
+
+                        <button class="primary-btn">
+                            ➕ Request Pickup
+                        </button>
+                    </div>
+
+                    <div class="bottom-nav">
+                        <div class="nav-item active">
+                            <div class="icon">🏠</div>
+                            <div class="label">হোম</div>
+                        </div>
+                        <div class="nav-item">
+                            <div class="icon">📋</div>
+                            <div class="label">ইতিহাস</div>
+                        </div>
+                        <div class="nav-item">
+                            <div class="icon">💰</div>
+                            <div class="label">মূল্য</div>
+                        </div>
+                        <div class="nav-item">
+                            <div class="icon">👤</div>
+                            <div class="label">প্রোফাইল</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <p class="screen-label">হোম স্ক্রিন</p>
+        </div>
+
+        <!-- Screen 2: উপাদান নির্বাচন -->
+        <div>
+            <div class="phone-frame">
+                <div class="phone-screen">
+                    <div class="status-bar">
+                        <span>12:58</span>
+                        <span>📶 🔋</span>
+                    </div>
+                    <div class="app-header">
+                        <span style="font-size: 24px;">←</span>
+                        <h2>উপাদান নির্বাচন করুন</h2>
+                    </div>
+                    <div class="material-list">
+                        <div class="material-item" style="border: 2px solid var(--primary);">
+                            <div class="icon" style="background: #E3F2FD;">🍾</div>
+                            <div class="info">
+                                <h4>প্লাস্টিক বোতল</h4>
+                                <p class="rate">৳১৫/kg</p>
+                            </div>
+                            <div class="quantity-control">
+                                <button class="qty-btn">−</button>
+                                <span class="qty-value">৩</span>
+                                <button class="qty-btn" style="background: var(--primary); color: white;">+</button>
+                            </div>
+                        </div>
+
+                        <div class="material-item" style="border: 2px solid var(--primary);">
+                            <div class="icon" style="background: #FFF3E0;">📰</div>
+                            <div class="info">
+                                <h4>পুরাতন সংবাদপত্র</h4>
+                                <p class="rate">৳১২/kg</p>
+                            </div>
+                            <div class="quantity-control">
+                                <button class="qty-btn">−</button>
+                                <span class="qty-value">৫</span>
+                                <button class="qty-btn" style="background: var(--primary); color: white;">+</button>
+                            </div>
+                        </div>
+
+                        <div class="material-item">
+                            <div class="icon" style="background: #F3E5F5;">🥫</div>
+                            <div class="info">
+                                <h4>ধাতুর জিনিস</h4>
+                                <p class="rate">৳৪০/kg</p>
+                            </div>
+                            <div class="quantity-control">
+                                <button class="qty-btn">−</button>
+                                <span class="qty-value">০</span>
+                                <button class="qty-btn">+</button>
+                            </div>
+                        </div>
+
+                        <div class="material-item">
+                            <div class="icon" style="background: #E8F5E9;">🛍️</div>
+                            <div class="info">
+                                <h4>প্লাস্টিক জিনিস</h4>
+                                <p class="rate">৳৮/kg</p>
+                            </div>
+                            <div class="quantity-control">
+                                <button class="qty-btn">−</button>
+                                <span class="qty-value">০</span>
+                                <button class="qty-btn">+</button>
+                            </div>
+                        </div>
+
+                        <div
+                            style="background: rgba(46,125,50,0.1); border-radius: 12px; padding: 15px; margin-top: 15px; text-align: center;">
+                            <span style="color: var(--text-gray);">আনুমানিক আয়</span>
+                            <p style="font-size: 24px; font-weight: 700; color: var(--primary);">৳১০৫ - ৳১২0</p>
+                        </div>
+
+                        <button class="primary-btn" style="margin-top: 20px;">
+                            Continue → সময়সূচী
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <p class="screen-label">উপাদান নির্বাচন করুন</p>
+        </div>
+
+        <!-- Screen 3: পিকআপ সময়সূচী -->
+        <div>
+            <div class="phone-frame">
+                <div class="phone-screen">
+                    <div class="status-bar">
+                        <span>12:58</span>
+                        <span>📶 🔋</span>
+                    </div>
+                    <div class="app-header">
+                        <span style="font-size: 24px;">←</span>
+                        <h2>পিকআপ সময়সূচী</h2>
+                    </div>
+                    <div class="schedule-section">
+                        <div class="date-picker">
+                            <h4>📅 Select Date</h4>
+                            <div class="date-grid">
+                                <div class="day">রবি</div>
+                                <div class="day">সোম</div>
+                                <div class="day">মঙ্গল</div>
+                                <div class="day">বুধ</div>
+                                <div class="day">বৃহঃ</div>
+                                <div class="day">শুক্র</div>
+                                <div class="day">শনি</div>
+                                <div class="date">19</div>
+                                <div class="date selected">20</div>
+                                <div class="date">21</div>
+                                <div class="date">22</div>
+                                <div class="date">23</div>
+                                <div class="date">24</div>
+                                <div class="date">25</div>
+                                <div class="date">26</div>
+                                <div class="date">27</div>
+                                <div class="date">28</div>
+                                <div class="date">29</div>
+                                <div class="date">30</div>
+                                <div class="date">31</div>
+                                <div class="date">1</div>
+                            </div>
+                        </div>
+
+                        <div class="time-slots">
+                            <h4>⏰ Select Time Slot</h4>
+                            <div class="slot-grid">
+                                <div class="time-slot">৯:০০ - ১১:০০ AM</div>
+                                <div class="time-slot selected">11:00 - ১:০০ PM</div>
+                                <div class="time-slot">2:00 - ৪:০০ PM</div>
+                                <div class="time-slot">4:00 - ৬:০০ PM</div>
+                            </div>
+                        </div>
+
+                        <button class="primary-btn" style="margin-top: 25px;">
+                            অনুরোধ নিশ্চিত করুন ✓
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <p class="screen-label">পিকআপ সময়সূচী</p>
+        </div>
+
+        <!-- Screen 4: Confirmation -->
+        <div>
+            <div class="phone-frame">
+                <div class="phone-screen">
+                    <div class="status-bar">
+                        <span>12:59</span>
+                        <span>📶 🔋</span>
+                    </div>
+                    <div class="app-header">
+                        <span style="font-size: 24px;">←</span>
+                        <h2>অনুরোধ নিশ্চিত</h2>
+                    </div>
+                    <div class="confirmation">
+                        <div style="text-align: center; margin-bottom: 25px;">
+                            <div
+                                style="width: 80px; height: 80px; background: linear-gradient(135deg, #4CAF50 0%, #8BC34A 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-size: 40px;">
+                                ✓</div>
+                            <h3 style="color: var(--primary);">অনুরোধ জমা দেওয়া হয়েছে!</h3>
+                            <p style="color: var(--text-gray); font-size: 14px;">একজন সংগ্রাহক শীঘ্রই আপনার অনুরোধ গ্রহণ করবেন
+                                </p>
+                        </div>
+
+                        <div class="summary-card">
+                            <h4>📦 পিকআপ বিবরণ</h4>
+                            <div class="summary-row">
+                                <span class="label">উপাদান</span>
+                                <span class="value">বোতল, কাগজ</span>
+                            </div>
+                            <div class="summary-row">
+                                <span class="label">তারিখ</span>
+                                <span class="value"> জানুয়ারি <20, 2026</span>
+                            </div>
+                            <div class="summary-row">
+                                <span class="label">সময়</span>
+                                <span class="value">১১:০০ AM - ১:০০ PM</span>
+                            </div>
+                            <div class="summary-row">
+                                <span class="label">অবস্থান</span>
+                                <span class="value">ধানমন্ডি, রোড 27</span>
+                            </div>
+                        </div>
+
+                        <div class="price-highlight">
+                            <p class="label">আনুমানিক আয়</p>
+                            <p class="amount">৳১০৫ - ৳১২0</p>
+                        </div>
+
+                        <button class="primary-btn"
+                            style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%); box-shadow: 0 4px 12px rgba(46,125,50,0.3);">
+                            🏠 Back to হোম
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <p class="screen-label">Confirmation</p>
+        </div>
+
+        <!-- NEW Screen 5: ইতিহাস/Past Pickups -->
+        <div>
+            <div class="phone-frame">
+                <div class="phone-screen">
+                    <div class="status-bar">
+                        <span>1:05</span>
+                        <span>📶 🔋</span>
+                    </div>
+                    <div class="app-header">
+                        <div class="logo">♻️</div>
+                        <h2>Pickup ইতিহাস</h2>
+                    </div>
+                    <div class="scrollable-content" style="padding: 20px;">
+                        <div class="history-item">
+                            <div class="history-header">
+                                <span class="history-date"> জানুয়ারি <15, 2026 • 11:30 AM</span>
+                                <span class="history-status status-completed">সম্পূর্ণ</span>
+                            </div>
+                            <div style="margin-bottom: 10px;">
+                                <p style="font-size: 14px; color: var(--text-dark); margin-bottom: 4px;">
+                                    <strong>Collector:</strong> Rahim Mia
+                                </p>
+                                <p style="font-size: 13px; color: var(--text-gray);">⭐ 4.8 rating</p>
+                            </div>
+                            <div class="history-details">
+                                <span class="history-materials">বোতল (5কেজি), কাগজ (3কেজি)</span>
+                                <span class="history-earning">৳111</span>
+                            </div>
+                        </div>
+
+                        <div class="history-item">
+                            <div class="history-header">
+                                <span class="history-date"> জানুয়ারি <8, 2026 • 2:15 PM</span>
+                                <span class="history-status status-completed">সম্পূর্ণ</span>
+                            </div>
+                            <div style="margin-bottom: 10px;">
+                                <p style="font-size: 14px; color: var(--text-dark); margin-bottom: 4px;">
+                                    <strong>Collector:</strong> Karim Sheikh
+                                </p>
+                                <p style="font-size: 13px; color: var(--text-gray);">⭐ 5.0 rating</p>
+                            </div>
+                            <div class="history-details">
+                                <span class="history-materials">ধাতু (2কেজি), প্লাস্টিক (4কেজি)</span>
+                                <span class="history-earning">৳112</span>
+                            </div>
+                        </div>
+
+                        <div class="history-item">
+                            <div class="history-header">
+                                <span class="history-date"> জানুয়ারি <2, 2026 • 10:00 AM</span>
+                                <span class="history-status status-completed">সম্পূর্ণ</span>
+                            </div>
+                            <div style="margin-bottom: 10px;">
+                                <p style="font-size: 14px; color: var(--text-dark); margin-bottom: 4px;">
+                                    <strong>Collector:</strong> Rahim Mia
+                                </p>
+                                <p style="font-size: 13px; color: var(--text-gray);">⭐ 4.8 rating</p>
+                            </div>
+                            <div class="history-details">
+                                <span class="history-materials">কাগজ (8কেজি)</span>
+                                <span class="history-earning">৳96</span>
+                            </div>
+                        </div>
+
+                        <div class="history-item">
+                            <div class="history-header">
+                                <span class="history-date">ডিসে 28, 2025 • 3:45 PM</span>
+                                <span class="history-status status-completed">সম্পূর্ণ</span>
+                            </div>
+                            <div style="margin-bottom: 10px;">
+                                <p style="font-size: 14px; color: var(--text-dark); margin-bottom: 4px;">
+                                    <strong>Collector:</strong> Jamal Hossain
+                                </p>
+                                <p style="font-size: 13px; color: var(--text-gray);">⭐ 4.6 rating</p>
+                            </div>
+                            <div class="history-details">
+                                <span class="history-materials">বোতল (4কেজি), ধাতু (1কেজি)</span>
+                                <span class="history-earning">৳১০০</span>
+                            </div>
+                        </div>
+
+                        <div style="text-align: center; color: var(--text-gray); margin-top: 20px; font-size: 14px;">
+                            <p>Total Earnings: <strong style="color: var(--primary); font-size: 18px;">৳419</strong></p>
+                        </div>
+                    </div>
+
+                    <div class="bottom-nav">
+                        <div class="nav-item">
+                            <div class="icon">🏠</div>
+                            <div class="label">হোম</div>
+                        </div>
+                        <div class="nav-item active">
+                            <div class="icon">📋</div>
+                            <div class="label">ইতিহাস</div>
+                        </div>
+                        <div class="nav-item">
+                            <div class="icon">💰</div>
+                            <div class="label">মূল্য</div>
+                        </div>
+                        <div class="nav-item">
+                            <div class="icon">👤</div>
+                            <div class="label">প্রোফাইল</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <p class="screen-label">ইতিহাস/Past Pickups</p>
+        </div>
+
+        <!-- NEW Screen 6: Price List Detail -->
+        <div>
+            <div class="phone-frame">
+                <div class="phone-screen">
+                    <div class="status-bar">
+                        <span>1:10</span>
+                        <span>📶 🔋</span>
+                    </div>
+                    <div class="app-header">
+                        <span style="font-size: 24px;">←</span>
+                        <h2>Material মূল্য</h2>
+                    </div>
+                    <div class="scrollable-content" style="padding: 20px;">
+                        <div
+                            style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%); border-radius: 16px; padding: 20px; color: white; margin-bottom: 20px;">
+                            <p style="font-size: 14px; opacity: 0.9;">Last Updated</p>
+                            <p style="font-size: 18px; font-weight: 600;"> জানুয়ারি <20, 2026 • ৯:০০ AM</p>
+                        </div>
+
+                        <h4 style="margin-bottom: 15px; color: var(--text-gray); font-size: 14px;">Current Market Rates
+                        </h4>
+
+                        <div class="price-item">
+                            <div class="price-info">
+                                <div class="category-icon" style="background: #E3F2FD;">🍾</div>
+                                <div>
+                                    <h4 style="font-size: 16px; color: var(--text-dark); margin-bottom: 4px;">প্লাস্টিক
+                                        বোতল</h4>
+                                    <p style="font-size: 20px; font-weight: 700; color: var(--primary);">৳১৫/kg</p>
+                                </div>
+                            </div>
+                            <span class="price-change price-up">↑ ৳2</span>
+                        </div>
+
+                        <div class="price-item">
+                            <div class="price-info">
+                                <div class="category-icon" style="background: #FFF3E0;">📰</div>
+                                <div>
+                                    <h4 style="font-size: 16px; color: var(--text-dark); margin-bottom: 4px;">Old
+                                        Newspapers</h4>
+                                    <p style="font-size: 20px; font-weight: 700; color: var(--primary);">৳১২/kg</p>
+                                </div>
+                            </div>
+                            <span class="price-change price-down">↓ ৳1</span>
+                        </div>
+
+                        <div class="price-item">
+                            <div class="price-info">
+                                <div class="category-icon" style="background: #F3E5F5;">🥫</div>
+                                <div>
+                                    <h4 style="font-size: 16px; color: var(--text-dark); margin-bottom: 4px;">ধাতু
+                                        Items</h4>
+                                    <p style="font-size: 20px; font-weight: 700; color: var(--primary);">৳৪০/kg</p>
+                                </div>
+                            </div>
+                            <span class="price-change price-up">↑ ৳5</span>
+                        </div>
+
+                        <div class="price-item">
+                            <div class="price-info">
+                                <div class="category-icon" style="background: #E8F5E9;">🛍️</div>
+                                <div>
+                                    <h4 style="font-size: 16px; color: var(--text-dark); margin-bottom: 4px;">প্লাস্টিক
+                                        Items</h4>
+                                    <p style="font-size: 20px; font-weight: 700; color: var(--primary);">৳৮/kg</p>
+                                </div>
+                            </div>
+                            <span class="price-change"
+                                style="background: var(--bg-cream); color: var(--text-gray);">—</span>
+                        </div>
+
+                        <div class="price-item">
+                            <div class="price-info">
+                                <div class="category-icon" style="background: #FFEBEE;">📦</div>
+                                <div>
+                                    <h4 style="font-size: 16px; color: var(--text-dark); margin-bottom: 4px;">Cardboard
+                                    </h4>
+                                    <p style="font-size: 20px; font-weight: 700; color: var(--primary);">৳10/kg</p>
+                                </div>
+                            </div>
+                            <span class="price-change price-up">↑ ৳1</span>
+                        </div>
+
+                        <div class="price-item">
+                            <div class="price-info">
+                                <div class="category-icon" style="background: #FFF9C4;">⚡</div>
+                                <div>
+                                    <h4 style="font-size: 16px; color: var(--text-dark); margin-bottom: 4px;">E-Waste
+                                    </h4>
+                                    <p style="font-size: 20px; font-weight: 700; color: var(--primary);">৳25/kg</p>
+                                </div>
+                            </div>
+                            <span class="price-change"
+                                style="background: var(--bg-cream); color: var(--text-gray);">—</span>
+                        </div>
+
+                        <div
+                            style="background: rgba(255,143,0,0.1); border-radius: 12px; padding: 15px; margin-top: 20px;">
+                            <p style="font-size: 13px; color: var(--text-gray); text-align: center;">
+                                💡 মূল্য updated daily based on market conditions
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="bottom-nav">
+                        <div class="nav-item">
+                            <div class="icon">🏠</div>
+                            <div class="label">হোম</div>
+                        </div>
+                        <div class="nav-item">
+                            <div class="icon">📋</div>
+                            <div class="label">ইতিহাস</div>
+                        </div>
+                        <div class="nav-item active">
+                            <div class="icon">💰</div>
+                            <div class="label">মূল্য</div>
+                        </div>
+                        <div class="nav-item">
+                            <div class="icon">👤</div>
+                            <div class="label">প্রোফাইল</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <p class="screen-label">Price List Detail</p>
+        </div>
+
+        <!-- NEW Screen 7: প্রোফাইল -->
+        <div>
+            <div class="phone-frame">
+                <div class="phone-screen">
+                    <div class="status-bar">
+                        <span>1:15</span>
+                        <span>📶 🔋</span>
+                    </div>
+                    <div class="app-header">
+                        <div class="logo">♻️</div>
+                        <h2>My প্রোফাইল</h2>
+                    </div>
+                    <div class="scrollable-content" style="padding: 20px;">
+                        <div
+                            style="background: white; border-radius: 16px; padding: 20px; margin-bottom: 20px; text-align: center; box-shadow: var(--shadow);">
+                            <div
+                                style="width: 80px; height: 80px; background: linear-gradient(135deg, #3F51B5 0%, #7986CB 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-size: 32px; color: white;">
+                                👤</div>
+                            <h3 style="font-size: 18px; margin-bottom: 5px;">Sarah Rahman</h3>
+                            <p style="color: var(--text-gray); font-size: 14px; margin-bottom: 10px;">📍 ধানমন্ডি, রোড
+                                27, বাসা 15</p>
+                            <p style="color: var(--primary); font-size: 14px;">⭐ 4.9 (8 ratings)</p>
+                        </div>
+
+                        <h4 style="margin-bottom: 15px; color: var(--text-gray); font-size: 14px;">Statistics</h4>
+
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <p class="value">12</p>
+                                <p class="label">Total Pickups</p>
+                            </div>
+                            <div class="stat-card">
+                                <p class="value">৳419</p>
+                                <p class="label">Total Earned</p>
+                            </div>
+                            <div class="stat-card">
+                                <p class="value">58kg</p>
+                                <p class="label">Materials Sold</p>
+                            </div>
+                            <div class="stat-card">
+                                <p class="value">29kg</p>
+                                <p class="label">CO₂ Saved</p>
+                            </div>
+                        </div>
+
+                        <h4 style="margin: 20px 0 15px; color: var(--text-gray); font-size: 14px;">Account Settings</h4>
+
+                        <div
+                            style="background: white; border-radius: 16px; padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow);">
+                            <p style="font-size: 15px; color: var(--text-dark);">📱 Phone Number</p>
+                            <p style="font-size: 14px; color: var(--text-gray); margin-top: 4px;">+880 1712-345678</p>
+                        </div>
+
+                        <div
+                            style="background: white; border-radius: 16px; padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow);">
+                            <p style="font-size: 15px; color: var(--text-dark);">📍 Default Address</p>
+                            <p style="font-size: 14px; color: var(--text-gray); margin-top: 4px;">বাসা 15, রোড 27,
+                                ধানমন্ডি, Dhaka</p>
+                        </div>
+
+                        <div
+                            style="background: white; border-radius: 16px; padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow);">
+                            <p style="font-size: 15px; color: var(--text-dark);">🌐 Language</p>
+                            <p style="font-size: 14px; color: var(--text-gray); margin-top: 4px;">English (বাংলা
+                                available)</p>
+                        </div>
+
+                        <div style="background: white; border-radius: 16px; padding: 16px; box-shadow: var(--shadow);">
+                            <p style="font-size: 15px; color: var(--text-dark);">🔔 Notifications</p>
+                            <p style="font-size: 14px; color: var(--text-gray); margin-top: 4px;">Enabled</p>
+                        </div>
+                    </div>
+
+                    <div class="bottom-nav">
+                        <div class="nav-item">
+                            <div class="icon">🏠</div>
+                            <div class="label">হোম</div>
+                        </div>
+                        <div class="nav-item">
+                            <div class="icon">📋</div>
+                            <div class="label">ইতিহাস</div>
+                        </div>
+                        <div class="nav-item">
+                            <div class="icon">💰</div>
+                            <div class="label">মূল্য</div>
+                        </div>
+                        <div class="nav-item active">
+                            <div class="icon">👤</div>
+                            <div class="label">প্রোফাইল</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <p class="screen-label">প্রোফাইল</p>
+        </div>
+
+        <!-- Screen 8: Rating -->
+        <div>
+            <div class="phone-frame">
+                <div class="phone-screen">
+                    <div class="status-bar">
+                        <span>1:20</span>
+                        <span>📶 🔋</span>
+                    </div>
+                    <div class="app-header">
+                        <h2 style="width: 100%; text-align: center;">Rate Your Experience</h2>
+                    </div>
+
+                    <div style="padding: 30px 20px; text-align: center;">
+                        <div
+                            style="width: 100px; height: 100px; background: linear-gradient(135deg, var(--secondary) 0%, var(--secondary-light) 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 48px;">
+                            👷</div>
+
+                        <h3 style="margin-bottom: 5px;">Rahim Mia</h3>
+                        <p style="color: var(--text-gray); font-size: 14px; margin-bottom: 25px;">সংগ্রাহক</p>
+
+                        <div style="font-size: 36px; margin-bottom: 25px;">
+                            ⭐ ⭐ ⭐ ⭐ ⭐
+                        </div>
+
+                        <div
+                            style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 25px;">
+                            <span
+                                style="background: rgba(46,125,50,0.1); color: var(--primary); padding: 8px 16px; border-radius: 20px; font-size: 13px;">Punctual
+                                ✓</span>
+                            <span
+                                style="background: rgba(46,125,50,0.1); color: var(--primary); padding: 8px 16px; border-radius: 20px; font-size: 13px;">Fair
+                                Price ✓</span>
+                            <span
+                                style="background: rgba(46,125,50,0.1); color: var(--primary); padding: 8px 16px; border-radius: 20px; font-size: 13px;">Respectful
+                                ✓</span>
+                            <span
+                                style="background: var(--bg-cream); color: var(--text-gray); padding: 8px 16px; border-radius: 20px; font-size: 13px;">Clean
+                                Pickup</span>
+                        </div>
+
+                        <textarea placeholder="Add a comment (optional)..."
+                            style="width: 100%; padding: 15px; border: 2px solid var(--border); border-radius: 12px; font-size: 14px; resize: none; height: 80px; margin-bottom: 20px;"></textarea>
+
+                        <button class="primary-btn">
+                            Submit Rating
+                        </button>
+
+                        <p style="color: var(--text-light); font-size: 13px; margin-top: 15px;">
+                            Skip →
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <p class="screen-label">Rating Screen</p>
+        </div>
+    </div>
+
+    <!-- প্রমাণীকরণ এবং বার্তা বিভাগ -->
+    <h2 class="section-title">🔐 প্রমাণীকরণ এবং বার্তা</h2>
+
+    <div class="mockup-grid">
+        <!-- Screen: Login -->
+        <div>
+            <div class="phone-frame">
+                <div class="phone-screen" style="background: white;">
+                    <div class="auth-content">
+                        <div class="auth-logo">♻️</div>
+                        <h2 class="auth-title">আবার স্বাগতম!</h2>
+                        <p class="auth-subtitle">আবার স্বাগতম • Log in to continue</p>
+
+                        <div class="input-group">
+                            <label>ফোন নম্বর</label>
+                            <input type="tel" placeholder="+৮৮০ ১৭১২-৩৪৫৬৭৮" value="">
+                        </div>
+
+                        <div class="input-group">
+                            <label>পাসওয়ার্ড</label>
+                            <input type="password" placeholder="আপনার পাসওয়ার্ড লিখুন">
+                        </div>
+
+                        <div class="forgot-password">
+                            <a href="#">পাসওয়ার্ড ভুলে গেছেন?</a>
+                        </div>
+
+                        <button class="primary-btn">
+                            Sign In
+                        </button>
+
+                        <div class="divider">অথবা এটি দিয়ে</div>
+
+                        <button class="primary-btn"
+                            style="background: white; color: var(--text-dark); border: 2px solid var(--border); box-shadow: none;">
+                            📱 Sign in with Phone OTP
+                        </button>
+
+                        <div class="auth-link">
+                            Don't have an account? <a href="#">নিবন্ধন করুন</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <p class="screen-label">প্রবেশ স্ক্রিন</p>
+        </div>
+
+        <!-- Screen: Signup -->
+        <div>
+            <div class="phone-frame">
+                <div class="phone-screen" style="background: white;">
+                    <div class="scrollable-content">
+                        <div class="auth-content">
+                            <div class="auth-logo">♻️</div>
+                            <h2 class="auth-title">অ্যাকাউন্ট তৈরি করুন</h2>
+                            <p class="auth-subtitle">শুরু করুন • Join the Bhangari Exchange</p>
+
+                            <div style="text-align: left; margin-bottom: 15px;">
+                                <label
+                                    style="font-size: 14px; font-weight: 600; color: var(--text-dark); margin-bottom: 10px; display: block;">I
+                                    am a:</label>
+                                <div class="role-selector">
+                                    <div class="role-option selected">
+                                        <div class="role-icon">🏠</div>
+                                        <div class="role-name">পরিবার</div>
+                                    </div>
+                                    <div class="role-option">
+                                        <div class="role-icon">👷</div>
+                                        <div class="role-name">সংগ্রাহক</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="input-group">
+                                <label>পূর্ণ নাম</label>
+                                <input type="text" placeholder="আপনার নাম লিখুন">
+                            </div>
+
+                            <div class="input-group">
+                                <label>ফোন নম্বর</label>
+                                <input type="tel" placeholder="+৮৮০ ১৭১২-৩৪৫৬৭৮">
+                            </div>
+
+                            <div class="input-group">
+                                <label>ঠিকানা</label>
+                                <input type="text" placeholder="বাসা, রোড, Area">
+                            </div>
+
+                            <div class="input-group">
+                                <label>পাসওয়ার্ড</label>
+                                <input type="password" placeholder="একটি পাসওয়ার্ড তৈরি করুন">
+                            </div>
+
+                            <button class="primary-btn">
+                                Create Account
+                            </button>
+
+                            <div class="auth-link">
+                                Already have an account? <a href="#">প্রবেশ করুন</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <p class="screen-label">নিবন্ধন স্ক্রিন</p>
+        </div>
+
+        <!-- Screen: Messages List -->
+        <div>
+            <div class="phone-frame">
+                <div class="phone-screen">
+                    <div class="status-bar">
+                        <span>2:15</span>
+                        <span>📶 🔋</span>
+                    </div>
+                    <div class="app-header">
+                        <div class="logo">💬</div>
+                        <h2>বার্তা</h2>
+                    </div>
+                    <div class="scrollable-content">
+                        <div class="chat-list">
+                            <div class="chat-item">
+                                <div class="chat-avatar"
+                                    style="background: linear-gradient(135deg, var(--secondary) 0%, var(--secondary-light) 100%); color: white;">
+                                    👷</div>
+                                <div class="chat-info">
+                                    <div class="chat-header">
+                                        <span class="chat-name">Rahim Mia</span>
+                                        <span class="chat-time">10:30 AM</span>
+                                    </div>
+                                    <p class="chat-preview">আমি 15 মিনিটের মধ্যে পৌঁছে যাব</p>
+                                </div>
+                                <div class="unread-badge">2</div>
+                            </div>
+
+                            <div class="chat-item">
+                                <div class="chat-avatar"
+                                    style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%); color: white;">
+                                    👷</div>
+                                <div class="chat-info">
+                                    <div class="chat-header">
+                                        <span class="chat-name">Karim Sheikh</span>
+                                        <span class="chat-time">গতকাল</span>
+                                    </div>
+                                    <p class="chat-preview">ধন্যবাদ! পরের বার আবার...</p>
+                                </div>
+                            </div>
+
+                            <div class="chat-item">
+                                <div class="chat-avatar"
+                                    style="background: linear-gradient(135deg, #3F51B5 0%, #7986CB 100%); color: white;">
+                                    👷</div>
+                                <div class="chat-info">
+                                    <div class="chat-header">
+                                        <span class="chat-name">Jamal Hossain</span>
+                                        <span class="chat-time"> জানুয়ারি <15</span>
+                                    </div>
+                                    <p class="chat-preview">ঠিক আছে, আমি আসছি</p>
+                                </div>
+                            </div>
+
+                            <div class="chat-item">
+                                <div class="chat-avatar"
+                                    style="background: linear-gradient(135deg, #E91E63 0%, #F48FB1 100%); color: white;">
+                                    👷</div>
+                                <div class="chat-info">
+                                    <div class="chat-header">
+                                        <span class="chat-name">Abdul Rahman</span>
+                                        <span class="chat-time"> জানুয়ারি <10</span>
+                                    </div>
+                                    <p class="chat-preview">আপনার কাছে মেটাল আছে?</p>
+                                </div>
+                            </div>
+
+                            <div
+                                style="background: rgba(255,143,0,0.1); border-radius: 12px; padding: 15px; margin-top: 20px; text-align: center;">
+                                <p style="font-size: 13px; color: var(--text-gray);">
+                                    💡 Contact collectors directly for quick communication
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bottom-nav">
+                        <div class="nav-item">
+                            <div class="icon">🏠</div>
+                            <div class="label">হোম</div>
+                        </div>
+                        <div class="nav-item active">
+                            <div class="icon">💬</div>
+                            <div class="label">বার্তা</div>
+                        </div>
+                        <div class="nav-item">
+                            <div class="icon">📋</div>
+                            <div class="label">ইতিহাস</div>
+                        </div>
+                        <div class="nav-item">
+                            <div class="icon">👤</div>
+                            <div class="label">প্রোফাইল</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <p class="screen-label">বার্তা তালিকা</p>
+        </div>
+
+        <!-- Screen: Chat Conversation -->
+        <div>
+            <div class="phone-frame">
+                <div class="phone-screen" style="background: var(--bg-cream);">
+                    <div class="status-bar">
+                        <span>2:16</span>
+                        <span>📶 🔋</span>
+                    </div>
+                    <div class="chat-header-bar">
+                        <span style="font-size: 24px; color: var(--text-gray);">←</span>
+                        <div class="chat-avatar"
+                            style="background: linear-gradient(135deg, var(--secondary) 0%, var(--secondary-light) 100%); color: white;">
+                            👷</div>
+                        <div style="flex: 1;">
+                            <h4 style="font-size: 16px; font-weight: 600; margin-bottom: 2px;">Rahim Mia</h4>
+                            <p style="font-size: 12px; color: var(--success);">● Active now</p>
+                        </div>
+                        <div style="font-size: 20px; color: var(--text-gray);">⋮</div>
+                    </div>
+
+                    <div class="message-list">
+                        <div class="message received">
+                            <div class="message-avatar"
+                                style="background: linear-gradient(135deg, var(--secondary) 0%, var(--secondary-light) 100%); color: white;">
+                                👷</div>
+                            <div>
+                                <div class="message-bubble">
+                                    আস্সালামু আলাইকুম! আমি আপনার রিকোয়েস্ট এক্সেপ্ট করেছি। আজ ১১-১ টার মধ্যে পৌঁছে যাব।
+                                </div>
+                                <div class="message-time">10:15 AM</div>
+                            </div>
+                        </div>
+
+                        <div class="message sent">
+                            <div>
+                                <div class="message-bubble">
+                                    ওয়ালাইকুম আস্সালাম। ধন্যবাদ! আমি বাসায় আছি।
+                                </div>
+                                <div class="message-time" style="text-align: right;">10:16 AM</div>
+                            </div>
+                            <div class="message-avatar"
+                                style="background: linear-gradient(135deg, #3F51B5 0%, #7986CB 100%); color: white;">🏠
+                            </div>
+                        </div>
+
+                        <div class="message received">
+                            <div class="message-avatar"
+                                style="background: linear-gradient(135deg, var(--secondary) 0%, var(--secondary-light) 100%); color: white;">
+                                👷</div>
+                            <div>
+                                <div class="message-bubble">
+                                    পেপার আর বোতলগুলো কি রেডি আছে?
+                                </div>
+                                <div class="message-time">10:18 AM</div>
+                            </div>
+                        </div>
+
+                        <div class="message sent">
+                            <div>
+                                <div class="message-bubble">
+                                    হ্যাঁ, সব রেডি করে রেখেছি।
+                                </div>
+                                <div class="message-time" style="text-align: right;">10:20 AM</div>
+                            </div>
+                            <div class="message-avatar"
+                                style="background: linear-gradient(135deg, #3F51B5 0%, #7986CB 100%); color: white;">🏠
+                            </div>
+                        </div>
+
+                        <div class="message received">
+                            <div class="message-avatar"
+                                style="background: linear-gradient(135deg, var(--secondary) 0%, var(--secondary-light) 100%); color: white;">
+                                👷</div>
+                            <div>
+                                <div class="message-bubble">
+                                    আমি 15 মিনিটের মধ্যে পৌঁছে যাব। ধন্যবাদ!
+                                </div>
+                                <div class="message-time">10:30 AM</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="chat-input-container">
+                        <div class="chat-input-wrapper">
+                            <input type="text" class="chat-input" placeholder="একটি বার্তা লিখুন...">
+                            <button class="send-btn">➤</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <p class="screen-label">কথোপকথন</p>
+        </div>
+    </div>
+
+
+    <footer style="text-align: center; color: rgba(255,255,255,0.7); margin-top: 50px; padding: 20px;">
+        <p>ভাঙ্গারি এক্সচেঞ্জ প্ল্যাটফর্ম - পরিবার ব্যবহারকারী ইন্টারফেস</p>
+        <p style="font-size: 14px; margin-top: 10px;">দল: Doctor Strange | বিভাগ: B</p>
+    </footer>
+
+    <script>
+        function setLanguage(lang) {
+            // Update active state
+            document.querySelectorAll('.lang-option').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Show notification
+            const langName = lang === 'en' ? 'English' : 'বাংলা';
+            alert('ভাষা পরিবর্তন করা হয়েছে: ' + langName + '\n\nনোট: এটি একটি মকআপ। প্রকৃত অ্যাপে সমস্ত লেখা অনুবাদ করা হবে।');
+        }
+    </script>
+</body>
+
+</html>
