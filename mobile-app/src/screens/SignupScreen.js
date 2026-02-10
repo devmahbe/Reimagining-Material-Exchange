@@ -95,7 +95,13 @@ export default function SignupScreen({ navigation }) {
         });
 
         Alert.alert('সফল', 'Google দিয়ে নিবন্ধন সফল হয়েছে!');
-        navigation.replace('HouseholdHome');
+        
+        // Navigate based on role
+        if (selectedRole === 'collector') {
+          navigation.replace('CollectorHome');
+        } else {
+          navigation.replace('HouseholdHome');
+        }
       }
     } catch (error) {
       console.log('Google Sign-Up Error:', error);

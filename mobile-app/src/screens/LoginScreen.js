@@ -29,9 +29,20 @@ export default function LoginScreen({ navigation }) {
 
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      
+      // Get user role from Firestore
+      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      const userData = userDoc.data();
+      
       Alert.alert('সফল', 'প্রবেশ সফল হয়েছে!');
-      navigation.replace('HouseholdHome');
+      
+      // Navigate based on role
+      if (userData?.role === 'collector') {
+        navigation.replace('CollectorHome');
+      } else {
+        navigation.replace('HouseholdHome');
+      }
     } catch (error) {
       let errorMsg = 'প্রবেশ ব্যর্থ';
       if (error.code === 'auth/user-not-found') {
@@ -69,8 +80,16 @@ export default function LoginScreen({ navigation }) {
         });
       }
 
+      const userData = userDoc.exists() ? userDoc.data() : { role: 'household' };
+      
       Alert.alert('সফল', 'Google দিয়ে প্রবেশ সফল হয়েছে!');
-      navigation.replace('HouseholdHome');
+      
+      // Navigate based on role
+      if (userData?.role === 'collector') {
+        navigation.replace('CollectorHome');
+      } else {
+        navigation.replace('HouseholdHome');
+      }
     } catch (error) {
       console.log('Google Sign-In Error:', error);
       Alert.alert('ত্রুটি', 'Google প্রবেশ ব্যর্থ: ' + error.message);

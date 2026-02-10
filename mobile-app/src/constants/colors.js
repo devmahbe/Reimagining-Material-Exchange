@@ -5,6 +5,7 @@ export default {
   secondaryLight: '#FFB74D',
   bgCream: '#FFF8E1',
   bgWhite: '#FFFFFF',
+  bgGreen: '#E8F5E9',
   textDark: '#212121',
   textGray: '#757575',
   textLight: '#9E9E9E',
