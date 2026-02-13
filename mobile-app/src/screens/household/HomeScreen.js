@@ -33,7 +33,10 @@ export default function HouseholdHomeScreen({ navigation }) {
             <Text style={styles.headerGreeting}>{banglaText.welcome}!</Text>
             <Text style={styles.headerSubtitle}>পরিবার ব্যবহারকারী</Text>
           </View>
-          <TouchableOpacity style={styles.profileButton}>
+          <TouchableOpacity 
+            style={styles.profileButton}
+            onPress={() => navigation.navigate('Profile')}
+          >
             <Text style={styles.profileIcon}>👤</Text>
           </TouchableOpacity>
         </View>
@@ -68,7 +71,10 @@ export default function HouseholdHomeScreen({ navigation }) {
         </View>
 
         {/* Primary Action Button */}
-        <TouchableOpacity style={styles.primaryButton}>
+        <TouchableOpacity 
+          style={styles.primaryButton}
+          onPress={() => navigation.navigate('MaterialSelection')}
+        >
           <LinearGradient
             colors={[colors.secondary, colors.secondaryLight]}
             style={styles.primaryButtonGradient}
@@ -79,17 +85,26 @@ export default function HouseholdHomeScreen({ navigation }) {
 
         {/* Quick Actions */}
         <View style={styles.quickActions}>
-          <TouchableOpacity style={styles.quickActionCard}>
+          <TouchableOpacity 
+            style={styles.quickActionCard}
+            onPress={() => {}}
+          >
             <Text style={styles.quickActionIcon}>💰</Text>
             <Text style={styles.quickActionText}>{banglaText.viewPrices}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.quickActionCard}>
+          <TouchableOpacity 
+            style={styles.quickActionCard}
+            onPress={() => navigation.navigate('MaterialSelection')}
+          >
             <Text style={styles.quickActionIcon}>📅</Text>
             <Text style={styles.quickActionText}>{banglaText.schedule}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.quickActionCard}>
+          <TouchableOpacity 
+            style={styles.quickActionCard}
+            onPress={() => navigation.navigate('History')}
+          >
             <Text style={styles.quickActionIcon}>📜</Text>
             <Text style={styles.quickActionText}>{banglaText.history}</Text>
           </TouchableOpacity>
@@ -103,17 +118,26 @@ export default function HouseholdHomeScreen({ navigation }) {
           <Text style={styles.navLabelActive}>হোম</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => {}}
+        >
           <Text style={styles.navIcon}>💬</Text>
           <Text style={styles.navLabel}>{banglaText.messages}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => navigation.navigate('History')}
+        >
           <Text style={styles.navIcon}>📜</Text>
           <Text style={styles.navLabel}>{banglaText.history}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => navigation.navigate('Profile')}
+        >
           <Text style={styles.navIcon}>👤</Text>
           <Text style={styles.navLabel}>{banglaText.profile}</Text>
         </TouchableOpacity>
