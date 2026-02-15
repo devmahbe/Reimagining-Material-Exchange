@@ -4,10 +4,8 @@
     "slug": "bhangari-exchange",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#2E7D32"
     },
@@ -20,13 +18,9 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#2E7D32"
       },
       "package": "com.doctorstrange.bhangari"
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
     }
   }
 }

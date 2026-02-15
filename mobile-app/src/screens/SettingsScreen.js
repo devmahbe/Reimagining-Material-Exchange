@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { signOut } from 'firebase/auth';
-import { auth } from '../firebase';
+import { auth } from '../config/firebase';
 import colors from '../constants/colors';
 
 export default function SettingsScreen({ navigation }) {

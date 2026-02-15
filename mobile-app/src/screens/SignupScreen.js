@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,9 +11,10 @@ import {
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { createUserWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { auth, db, googleProvider } from '../config/firebase';
+import { auth, db } from '../config/firebase';
+import { useGoogleAuth, handleGoogleAuthResponse } from '../utils/googleAuth';
 import colors from '../constants/colors';
 import banglaText from '../constants/banglaText';
 
@@ -25,6 +26,57 @@ export default function SignupScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState('household');
   const [loading, setLoading] = useState(false);
+  
+  // Google Auth for mobile
+  const { request, response, promptAsync } = Platform.OS === 'web' ? { request: null, response: null, promptAsync: null } : useGoogleAuth();
+  
+  // Handle Google auth response for mobile
+  useEffect(() => {
+    if (Platform.OS !== 'web' && response) {
+      handleGoogleSignUpMobile();
+    }
+  }, [response]);
+  
+  const handleGoogleSignUpMobile = async () => {
+    try {
+      setLoading(true);
+      const userCredential = await handleGoogleAuthResponse(response);
+      const user = userCredential.user;
+      
+      // Check if user already exists
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      
+      if (userDoc.exists()) {
+        Alert.alert('বিদ্যমান', 'এই অ্যাকাউন্ট ইতিমধ্যে আছে। লগইন করুন।');
+        navigation.replace('Login');
+      } else {
+        // Create new user with selected role
+        await setDoc(doc(db, 'users', user.uid), {
+          name: user.displayName,
+          email: user.email,
+          phone: '',
+          address: '',
+          role: selectedRole,
+          createdAt: new Date().toISOString(),
+          authProvider: 'google',
+        });
+        
+        Alert.alert('সফল', 'Google দিয়ে নিবন্ধন সফল হয়েছে!');
+        
+        // Navigate based on role
+        if (selectedRole === 'collector') {
+          navigation.replace('CollectorHome');
+        } else {
+          navigation.replace('HouseholdHome');
+        }
+      }
+    } catch (error) {
+      console.log('Google Sign-Up Error:', error);
+      Alert.alert('ত্রুটি', 'Google নিবন্ধন ব্যর্থ');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSignup = async () => {
     if (!name || !email || !phone || !password) {
@@ -69,44 +121,51 @@ export default function SignupScreen({ navigation }) {
       setLoading(false);
     }
   };
-
+  
   const handleGoogleSignup = async () => {
     setLoading(true);
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
-
-      // Check if user already exists
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      
-      if (userDoc.exists()) {
-        Alert.alert('বিদ্যমান', 'এই অ্যাকাউন্ট ইতিমধ্যে আছে। লগইন করুন।');
-        navigation.replace('Login');
-      } else {
-        // Create new user with selected role
-        await setDoc(doc(db, 'users', user.uid), {
-          name: user.displayName,
-          email: user.email,
-          phone: '',
-          address: '',
-          role: selectedRole,
-          createdAt: new Date().toISOString(),
-          authProvider: 'google',
-        });
-
-        Alert.alert('সফল', 'Google দিয়ে নিবন্ধন সফল হয়েছে!');
+      if (Platform.OS === 'web') {
+        // Web: Use popup
+        const googleProvider = new GoogleAuthProvider();
+        const result = await signInWithPopup(auth, googleProvider);
+        const user = result.user;
         
-        // Navigate based on role
-        if (selectedRole === 'collector') {
-          navigation.replace('CollectorHome');
+        // Check if user already exists
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        
+        if (userDoc.exists()) {
+          Alert.alert('বিদ্যমান', 'এই অ্যাকাউন্ট ইতিমধ্যে আছে। লগইন করুন।');
+          navigation.replace('Login');
         } else {
-          navigation.replace('HouseholdHome');
+          // Create new user with selected role
+          await setDoc(doc(db, 'users', user.uid), {
+            name: user.displayName,
+            email: user.email,
+            phone: '',
+            address: '',
+            role: selectedRole,
+            createdAt: new Date().toISOString(),
+            authProvider: 'google',
+          });
+          
+          Alert.alert('সফল', 'Google দিয়ে নিবন্ধন সফল হয়েছে!');
+          
+          // Navigate based on role
+          if (selectedRole === 'collector') {
+            navigation.replace('CollectorHome');
+          } else {
+            navigation.replace('HouseholdHome');
+          }
         }
+      } else {
+        // Mobile: Use expo-auth-session
+        await promptAsync();
+        // Response will be handled by useEffect
       }
     } catch (error) {
       console.log('Google Sign-Up Error:', error);
-      Alert.alert('ত্রুটি', 'Google নিবন্ধন ব্যর্থ: ' + error.message);
-    } finally {
+      Alert.alert('ত্রুটি', 'Google নিবন্ধন ব্যর্থ');
       setLoading(false);
     }
   };
@@ -235,7 +294,7 @@ export default function SignupScreen({ navigation }) {
               <TouchableOpacity
                 style={styles.googleButton}
                 onPress={handleGoogleSignup}
-                disabled={loading}
+                disabled={loading || (Platform.OS !== 'web' && !request)}
               >
                 <Text style={styles.googleIcon}>🔍</Text>
                 <Text style={styles.googleButtonText}>Google দিয়ে নিবন্ধন করুন</Text>

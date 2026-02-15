@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import { auth, db } from '../../firebase';
+import { auth, db } from '../../config/firebase';
 import colors from '../../constants/colors';
 
 export default function HistoryScreen({ navigation }) {

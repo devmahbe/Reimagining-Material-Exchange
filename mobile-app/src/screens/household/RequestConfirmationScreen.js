@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { collection, addDoc } from 'firebase/firestore';
-import { auth, db } from '../../firebase';
+import { auth, db } from '../../config/firebase';
 import colors from '../../constants/colors';
 
 export default function RequestConfirmationScreen({ navigation, route }) {

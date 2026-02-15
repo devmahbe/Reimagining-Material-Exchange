@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import { db, auth } from '../../firebase';
+import { db, auth } from '../../config/firebase';
 import colors from '../../constants/colors';
 
 export default function CollectorHomeScreen({ navigation }) {

@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db, auth } from '../../firebase';
+import { db, auth } from '../../config/firebase';
 import colors from '../../constants/colors';
 
 export default function RequestDetailsScreen({ navigation, route }) {

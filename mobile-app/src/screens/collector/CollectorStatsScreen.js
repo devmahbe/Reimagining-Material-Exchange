@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db, auth } from '../../firebase';
+import { db, auth } from '../../config/firebase';
 import colors from '../../constants/colors';
 
 const screenWidth = Dimensions.get('window').width;

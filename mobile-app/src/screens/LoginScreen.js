@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,9 +10,10 @@ import {
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
-import { auth, googleProvider, db } from '../config/firebase';
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { auth, db } from '../config/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { useGoogleAuth, handleGoogleAuthResponse } from '../utils/googleAuth';
 import colors from '../constants/colors';
 import banglaText from '../constants/banglaText';
 
@@ -20,6 +21,55 @@ export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // Google Auth for mobile
+  const { request, response, promptAsync } = Platform.OS === 'web' ? { request: null, response: null, promptAsync: null } : useGoogleAuth();
+  
+  // Handle Google auth response for mobile
+  useEffect(() => {
+    if (Platform.OS !== 'web' && response) {
+      handleGoogleSignInMobile();
+    }
+  }, [response]);
+  
+  const handleGoogleSignInMobile = async () => {
+    try {
+      setLoading(true);
+      const userCredential = await handleGoogleAuthResponse(response);
+      const user = userCredential.user;
+      
+      // Check if user exists in Firestore
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      
+      if (!userDoc.exists()) {
+        // New Google user - create profile
+        await setDoc(doc(db, 'users', user.uid), {
+          name: user.displayName,
+          email: user.email,
+          phone: '',
+          address: '',
+          role: 'household',
+          createdAt: new Date().toISOString(),
+          authProvider: 'google',
+        });
+      }
+      
+      const userData = userDoc.exists() ? userDoc.data() : { role: 'household' };
+      Alert.alert('সফল', 'Google দিয়ে প্রবেশ সফল হয়েছে!');
+      
+      // Navigate based on role
+      if (userData?.role === 'collector') {
+        navigation.replace('CollectorHome');
+      } else {
+        navigation.replace('HouseholdHome');
+      }
+    } catch (error) {
+      console.log('Google Sign-In Error:', error);
+      Alert.alert('ত্রুটি', 'Google প্রবেশ ব্যর্থ');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -52,48 +102,54 @@ export default function LoginScreen({ navigation }) {
       } else if (error.code === 'auth/invalid-email') {
         errorMsg = 'ভুল ইমেইল ফরম্যাট';
       }
-      Alert.alert('ত্রুটি', errorMsg);
+      Alert.alert('ত্রুটi', errorMsg);
     } finally {
       setLoading(false);
     }
   };
-
+  
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
-
-      // Check if user exists in Firestore
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      
-      if (!userDoc.exists()) {
-        // New Google user - create profile
-        await setDoc(doc(db, 'users', user.uid), {
-          name: user.displayName,
-          email: user.email,
-          phone: '',
-          address: '',
-          role: 'household', // Default role
-          createdAt: new Date().toISOString(),
-          authProvider: 'google',
-        });
-      }
-
-      const userData = userDoc.exists() ? userDoc.data() : { role: 'household' };
-      
-      Alert.alert('সফল', 'Google দিয়ে প্রবেশ সফল হয়েছে!');
-      
-      // Navigate based on role
-      if (userData?.role === 'collector') {
-        navigation.replace('CollectorHome');
+      if (Platform.OS === 'web') {
+        // Web: Use popup
+        const googleProvider = new GoogleAuthProvider();
+        const result = await signInWithPopup(auth, googleProvider);
+        const user = result.user;
+        
+        // Check if user exists in Firestore
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        
+        if (!userDoc.exists()) {
+          // New Google user - create profile
+          await setDoc(doc(db, 'users', user.uid), {
+            name: user.displayName,
+            email: user.email,
+            phone: '',
+            address: '',
+            role: 'household',
+            createdAt: new Date().toISOString(),
+            authProvider: 'google',
+          });
+        }
+        
+        const userData = userDoc.exists() ? userDoc.data() : { role: 'household' };
+        Alert.alert('সফল', 'Google দিয়ে প্রবেশ সফল হয়েছে!');
+        
+        // Navigate based on role
+        if (userData?.role === 'collector') {
+          navigation.replace('CollectorHome');
+        } else {
+          navigation.replace('HouseholdHome');
+        }
       } else {
-        navigation.replace('HouseholdHome');
+        // Mobile: Use expo-auth-session
+        await promptAsync();
+        // Response will be handled by useEffect
       }
     } catch (error) {
       console.log('Google Sign-In Error:', error);
-      Alert.alert('ত্রুটি', 'Google প্রবেশ ব্যর্থ: ' + error.message);
-    } finally {
+      Alert.alert('ত্রুটি', 'Google প্রবেশ ব্যর্থ');
       setLoading(false);
     }
   };
@@ -167,7 +223,7 @@ export default function LoginScreen({ navigation }) {
             <TouchableOpacity
               style={styles.googleButton}
               onPress={handleGoogleSignIn}
-              disabled={loading}
+              disabled={loading || (Platform.OS !== 'web' && !request)}
             >
               <Text style={styles.googleIcon}>🔍</Text>
               <Text style={styles.googleButtonText}>Google দিয়ে প্রবেশ করুন</Text>
