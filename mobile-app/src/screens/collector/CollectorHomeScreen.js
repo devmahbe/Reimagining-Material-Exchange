@@ -98,36 +98,50 @@ export default function CollectorHomeScreen({ navigation }) {
           <Text style={styles.welcomeText}>স্বাগতম 👷</Text>
           <Text style={styles.headerTitle}>সংগ্রাহক ড্যাশবোর্ড</Text>
         </View>
-        <TouchableOpacity 
-          style={styles.notificationButton}
-          onPress={() => {}}
-        >
-          <Text style={styles.notificationIcon}>🔔</Text>
-          {stats.pendingRequests > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{stats.pendingRequests}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity 
+            style={styles.notificationButton}
+            onPress={() => navigation.navigate('Notifications')}
+          >
+            <Text style={styles.notificationIcon}>🔔</Text>
+            {stats.pendingRequests > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{stats.pendingRequests}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.statsButton}
+            onPress={() => navigation.navigate('CollectorStats')}
+          >
+            <Text style={styles.statsIcon}>📊</Text>
+          </TouchableOpacity>
+        </View>
       </LinearGradient>
 
       {/* Stats Cards */}
       <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
+        <TouchableOpacity 
+          style={styles.statCard}
+          onPress={() => navigation.navigate('CollectorStats')}
+        >
           <View style={styles.statIconContainer}>
             <Text style={styles.statIcon}>📦</Text>
           </View>
           <Text style={styles.statValue}>{stats.todayPickups}</Text>
           <Text style={styles.statLabel}>আজকের পিকআপ</Text>
-        </View>
+        </TouchableOpacity>
         
-        <View style={styles.statCard}>
+        <TouchableOpacity 
+          style={styles.statCard}
+          onPress={() => navigation.navigate('CollectorStats')}
+        >
           <View style={styles.statIconContainer}>
             <Text style={styles.statIcon}>💰</Text>
           </View>
           <Text style={styles.statValue}>৳{stats.weekEarnings}</Text>
           <Text style={styles.statLabel}>সপ্তাহের আয়</Text>
-        </View>
+        </TouchableOpacity>
         
         <View style={styles.statCard}>
           <View style={styles.statIconContainer}>
@@ -249,8 +263,29 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: 'white',
   },
+  headerButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  statsButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 45,
+    height: 45,
+    borderRadius: 23,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statsIcon: {
+    fontSize: 24,
+  },
   notificationButton: {
     position: 'relative',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 45,
+    height: 45,
+    borderRadius: 23,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   notificationIcon: {
     fontSize: 28,

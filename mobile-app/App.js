@@ -18,6 +18,13 @@ import ProfileScreen from './src/screens/household/ProfileScreen';
 // Collector screens
 import CollectorHomeScreen from './src/screens/collector/CollectorHomeScreen';
 import RequestDetailsScreen from './src/screens/collector/RequestDetailsScreen';
+import CollectorStatsScreen from './src/screens/collector/CollectorStatsScreen';
+
+// Shared screens
+import MessagesScreen from './src/screens/MessagesScreen';
+import PriceListScreen from './src/screens/PriceListScreen';
+import NotificationsScreen from './src/screens/NotificationsScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
 
 const Stack = createStackNavigator();
 
@@ -47,6 +54,13 @@ export default function App() {
           {/* Collector Screens */}
           <Stack.Screen name="CollectorHome" component={CollectorHomeScreen} />
           <Stack.Screen name="RequestDetails" component={RequestDetailsScreen} />
+          <Stack.Screen name="CollectorStats" component={CollectorStatsScreen} />
+          
+          {/* Shared Screens */}
+          <Stack.Screen name="Messages" component={MessagesScreen} />
+          <Stack.Screen name="PriceList" component={PriceListScreen} />
+          <Stack.Screen name="Notifications" component={NotificationsScreen} />
+          <Stack.Screen name="Settings" component={SettingsScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </>

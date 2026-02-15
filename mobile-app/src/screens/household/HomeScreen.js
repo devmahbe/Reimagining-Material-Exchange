@@ -33,12 +33,20 @@ export default function HouseholdHomeScreen({ navigation }) {
             <Text style={styles.headerGreeting}>{banglaText.welcome}!</Text>
             <Text style={styles.headerSubtitle}>পরিবার ব্যবহারকারী</Text>
           </View>
-          <TouchableOpacity 
-            style={styles.profileButton}
-            onPress={() => navigation.navigate('Profile')}
-          >
-            <Text style={styles.profileIcon}>👤</Text>
-          </TouchableOpacity>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity 
+              style={styles.notificationButton}
+              onPress={() => navigation.navigate('Notifications')}
+            >
+              <Text style={styles.notificationIcon}>🔔</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.profileButton}
+              onPress={() => navigation.navigate('Profile')}
+            >
+              <Text style={styles.profileIcon}>👤</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </LinearGradient>
 
@@ -87,7 +95,7 @@ export default function HouseholdHomeScreen({ navigation }) {
         <View style={styles.quickActions}>
           <TouchableOpacity 
             style={styles.quickActionCard}
-            onPress={() => {}}
+            onPress={() => navigation.navigate('PriceList')}
           >
             <Text style={styles.quickActionIcon}>💰</Text>
             <Text style={styles.quickActionText}>{banglaText.viewPrices}</Text>
@@ -120,7 +128,7 @@ export default function HouseholdHomeScreen({ navigation }) {
 
         <TouchableOpacity 
           style={styles.navItem}
-          onPress={() => {}}
+          onPress={() => navigation.navigate('Messages')}
         >
           <Text style={styles.navIcon}>💬</Text>
           <Text style={styles.navLabel}>{banglaText.messages}</Text>
@@ -172,6 +180,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.9)',
     marginTop: 4,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  notificationButton: {
+    width: 45,
+    height: 45,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notificationIcon: {
+    fontSize: 22,
   },
   profileButton: {
     width: 45,
