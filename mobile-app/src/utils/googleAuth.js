@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
@@ -10,6 +11,12 @@ const GOOGLE_WEB_CLIENT_ID = '1083221786919-aka14r2qpg96dinbbbdct2imkc9ke7ic.app
 
 
 export const useGoogleAuth = () => {
+  // On web, return null values since we use signInWithPopup instead
+  if (Platform.OS === 'web') {
+    return { request: null, response: null, promptAsync: null };
+  }
+  
+  // On mobile, use expo-auth-session
   const [request, response, promptAsync] = Google.useAuthRequest({
     webClientId: GOOGLE_WEB_CLIENT_ID,
     // Optional: Add these if you create Android/iOS apps in Google Cloud Console

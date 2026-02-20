@@ -22,8 +22,9 @@ export default function LoginScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   
-  // Google Auth for mobile
-  const { request, response, promptAsync } = Platform.OS === 'web' ? { request: null, response: null, promptAsync: null } : useGoogleAuth();
+  // Google Auth (works on all platforms, but we only use it on mobile)
+  const googleAuth = useGoogleAuth();
+  const { request, response, promptAsync } = googleAuth || { request: null, response: null, promptAsync: null };
   
   // Handle Google auth response for mobile
   useEffect(() => {
