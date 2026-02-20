@@ -11,6 +11,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { collection, addDoc } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
+import { uploadMultipleImages, calculateEarnings } from '../../utils/helpers';
 import colors from '../../constants/colors';
 
 export default function RequestConfirmationScreen({ navigation, route }) {
@@ -31,22 +32,40 @@ export default function RequestConfirmationScreen({ navigation, route }) {
     try {
       const user = auth.currentUser;
       
+      // Upload images if any
+      let imageUrls = [];
+      if (images && images.length > 0) {
+        try {
+          imageUrls = await uploadMultipleImages(images, 'pickups');
+        } catch (uploadError) {
+          console.log('Image upload failed, continuing without images:', uploadError);
+        }
+      }
+      
+      // Calculate earnings
+      const estimatedEarnings = calculateEarnings(materials);
+      
       await addDoc(collection(db, 'pickupRequests'), {
         userId: user.uid,
         userEmail: user.email,
         materials: materials.map(m => ({
           name: m.name,
+          icon: m.icon,
           quantity: m.quantity,
           unit: m.unit,
           price: m.price
         })),
-        imagesCount: images.length,
-        scheduledDate: date.display,
-        scheduledTime: time.time,
+        images: imageUrls,
+        schedule: {
+          date: date.full.toISOString(),
+          dateDisplay: date.display,
+          timeSlot: time.time,
+          timeValue: time.value
+        },
         address,
         phone,
         notes,
-        estimatedValue: getTotalEstimate(),
+        estimatedEarnings,
         status: 'pending',
         createdAt: new Date().toISOString(),
       });

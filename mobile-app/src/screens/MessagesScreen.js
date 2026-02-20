@@ -126,7 +126,10 @@ export default function MessagesScreen({ navigation }) {
             <TouchableOpacity
               key={conversation.id}
               style={styles.conversationCard}
-              onPress={() => navigation.navigate('Chat', { conversationId: conversation.id, name: conversation.name })}
+              onPress={() => navigation.navigate('ChatScreen', { 
+                recipientId: conversation.id,
+                recipientName: conversation.name
+              })}
             >
               <View style={styles.avatarContainer}>
                 <Text style={styles.avatar}>{conversation.avatar}</Text>

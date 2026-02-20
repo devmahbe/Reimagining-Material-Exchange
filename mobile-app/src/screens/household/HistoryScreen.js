@@ -117,13 +117,33 @@ export default function HistoryScreen({ navigation }) {
 
                 <View style={styles.requestDetails}>
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>📅 {request.scheduledDate}</Text>
-                    <Text style={styles.detailLabel}>⏰ {request.scheduledTime}</Text>
+                    <Text style={styles.detailLabel}>📅 {new Date(request.schedule?.date).toLocaleDateString('bn-BD')}</Text>
+                    <Text style={styles.detailLabel}>⏰ {request.schedule?.timeSlot}</Text>
                   </View>
                   <View style={styles.requestFooter}>
                     <Text style={styles.estimateText}>
-                      আনুমানিক: ৳{request.estimatedValue}
+                      আনুমানিক: ৳{request.estimatedEarnings || 0}
                     </Text>
+                    {(request.status === 'accepted' || request.status === 'on-the-way' || request.status === 'at-location') && (
+                      <TouchableOpacity
+                        style={styles.trackButton}
+                        onPress={() => navigation.navigate('TrackPickup', { requestId: request.id })}
+                      >
+                        <Text style={styles.trackButtonText}>📍 ট্র্যাক করুন</Text>
+                      </TouchableOpacity>
+                    )}
+                    {request.status === 'completed' && !request.userRating && (
+                      <TouchableOpacity
+                        style={styles.rateButton}
+                        onPress={() => navigation.navigate('RateCollector', {
+                          requestId: request.id,
+                          collectorId: request.collectorId,
+                          collectorName: request.collectorName || 'সংগ্রাহক'
+                        })}
+                      >
+                        <Text style={styles.rateButtonText}>⭐ রেটিং দিন</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               </View>
@@ -246,10 +266,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   estimateText: {
     fontSize: 16,
     fontWeight: '700',
     color: colors.primary,
+  },
+  trackButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  trackButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  rateButton: {
+    backgroundColor: colors.secondary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  rateButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

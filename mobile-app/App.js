@@ -14,14 +14,18 @@ import SchedulePickupScreen from './src/screens/household/SchedulePickupScreen';
 import RequestConfirmationScreen from './src/screens/household/RequestConfirmationScreen';
 import HistoryScreen from './src/screens/household/HistoryScreen';
 import ProfileScreen from './src/screens/household/ProfileScreen';
+import TrackPickupScreen from './src/screens/household/TrackPickupScreen';
+import RateCollectorScreen from './src/screens/household/RateCollectorScreen';
 
 // Collector screens
 import CollectorHomeScreen from './src/screens/collector/CollectorHomeScreen';
 import RequestDetailsScreen from './src/screens/collector/RequestDetailsScreen';
 import CollectorStatsScreen from './src/screens/collector/CollectorStatsScreen';
+import EarningsScreen from './src/screens/collector/EarningsScreen';
 
 // Shared screens
 import MessagesScreen from './src/screens/MessagesScreen';
+import ChatScreen from './src/screens/ChatScreen';
 import PriceListScreen from './src/screens/PriceListScreen';
 import NotificationsScreen from './src/screens/NotificationsScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
@@ -50,14 +54,18 @@ export default function App() {
           <Stack.Screen name="RequestConfirmation" component={RequestConfirmationScreen} />
           <Stack.Screen name="History" component={HistoryScreen} />
           <Stack.Screen name="Profile" component={ProfileScreen} />
+          <Stack.Screen name="TrackPickup" component={TrackPickupScreen} />
+          <Stack.Screen name="RateCollector" component={RateCollectorScreen} />
           
           {/* Collector Screens */}
           <Stack.Screen name="CollectorHome" component={CollectorHomeScreen} />
           <Stack.Screen name="RequestDetails" component={RequestDetailsScreen} />
           <Stack.Screen name="CollectorStats" component={CollectorStatsScreen} />
+          <Stack.Screen name="Earnings" component={EarningsScreen} />
           
           {/* Shared Screens */}
           <Stack.Screen name="Messages" component={MessagesScreen} />
+          <Stack.Screen name="ChatScreen" component={ChatScreen} />
           <Stack.Screen name="PriceList" component={PriceListScreen} />
           <Stack.Screen name="Notifications" component={NotificationsScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />

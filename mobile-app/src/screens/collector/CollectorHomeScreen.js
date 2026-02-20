@@ -134,7 +134,7 @@ export default function CollectorHomeScreen({ navigation }) {
         
         <TouchableOpacity 
           style={styles.statCard}
-          onPress={() => navigation.navigate('CollectorStats')}
+          onPress={() => navigation.navigate('Earnings')}
         >
           <View style={styles.statIconContainer}>
             <Text style={styles.statIcon}>💰</Text>
