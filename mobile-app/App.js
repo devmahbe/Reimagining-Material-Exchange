@@ -24,6 +24,7 @@ import CollectorStatsScreen from './src/screens/collector/CollectorStatsScreen';
 import EarningsScreen from './src/screens/collector/EarningsScreen';
 
 // Shared screens
+import BKashPaymentScreen from './src/screens/BKashPaymentScreen';
 import MessagesScreen from './src/screens/MessagesScreen';
 import ChatScreen from './src/screens/ChatScreen';
 import PriceListScreen from './src/screens/PriceListScreen';
@@ -64,6 +65,7 @@ export default function App() {
           <Stack.Screen name="Earnings" component={EarningsScreen} />
           
           {/* Shared Screens */}
+          <Stack.Screen name="BKashPayment" component={BKashPaymentScreen} />
           <Stack.Screen name="Messages" component={MessagesScreen} />
           <Stack.Screen name="ChatScreen" component={ChatScreen} />
           <Stack.Screen name="PriceList" component={PriceListScreen} />

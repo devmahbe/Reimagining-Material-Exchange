@@ -9,7 +9,7 @@ import {
   TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { collection, query, where, getDocs, orderBy, addDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
 import colors from '../constants/colors';
 
@@ -24,38 +24,82 @@ export default function MessagesScreen({ navigation }) {
 
   const loadConversations = async () => {
     try {
-      // Mock conversations for now - in real app, query from Firestore
-      const mockConversations = [
-        {
-          id: '1',
-          name: 'রহিম সংগ্রাহক',
-          lastMessage: 'আমি ১০ মিনিটে পৌঁছাবো',
-          timestamp: new Date(Date.now() - 300000), // 5 min ago
-          unreadCount: 2,
-          userType: 'collector',
-          avatar: '👷',
-        },
-        {
-          id: '2',
-          name: 'করিম পরিবার',
-          lastMessage: 'ধন্যবাদ, আগামীকাল ঠিক আছে',
-          timestamp: new Date(Date.now() - 3600000), // 1 hour ago
-          unreadCount: 0,
-          userType: 'household',
-          avatar: '🏠',
-        },
-        {
-          id: '3',
-          name: 'সাপোর্ট টিম',
-          lastMessage: 'আপনার অনুরোধটি প্রক্রিয়াধীন আছে',
-          timestamp: new Date(Date.now() - 86400000), // 1 day ago
-          unreadCount: 0,
-          userType: 'support',
-          avatar: '💬',
-        },
-      ];
-      
-      setConversations(mockConversations);
+      const user = auth.currentUser;
+      if (!user) return;
+
+      // Fetch messages sent by and received by the current user
+      const [sentSnap, receivedSnap] = await Promise.all([
+        getDocs(query(
+          collection(db, 'messages'),
+          where('senderId', '==', user.uid),
+          orderBy('createdAt', 'desc')
+        )),
+        getDocs(query(
+          collection(db, 'messages'),
+          where('recipientId', '==', user.uid),
+          orderBy('createdAt', 'desc')
+        )),
+      ]);
+
+      // Build map: conversationId → { otherUserId, lastMessage, lastMessageTime }
+      const convMap = new Map();
+      const processSnap = (snapshot) => {
+        snapshot.forEach((d) => {
+          const msg = { id: d.id, ...d.data() };
+          const otherUserId = msg.senderId === user.uid ? msg.recipientId : msg.senderId;
+          const existing = convMap.get(msg.conversationId);
+          if (!existing || msg.createdAt > existing.lastMessageTime) {
+            convMap.set(msg.conversationId, {
+              conversationId: msg.conversationId,
+              otherUserId,
+              lastMessage: msg.text,
+              lastMessageTime: msg.createdAt,
+            });
+          }
+        });
+      };
+      processSnap(sentSnap);
+      processSnap(receivedSnap);
+
+      // Count unread messages per conversation
+      const unreadSnap = await getDocs(query(
+        collection(db, 'messages'),
+        where('recipientId', '==', user.uid),
+        where('read', '==', false)
+      ));
+      const unreadCounts = {};
+      unreadSnap.forEach((d) => {
+        const cid = d.data().conversationId;
+        unreadCounts[cid] = (unreadCounts[cid] || 0) + 1;
+      });
+
+      // Resolve other user's name and role
+      const conversations = await Promise.all(
+        Array.from(convMap.values()).map(async (conv) => {
+          try {
+            const userDoc = await getDoc(doc(db, 'users', conv.otherUserId));
+            const userData = userDoc.exists() ? userDoc.data() : {};
+            return {
+              id: conv.conversationId,
+              otherUserId: conv.otherUserId,
+              name: userData.name || 'অজানা ব্যবহারকারী',
+              lastMessage: conv.lastMessage,
+              timestamp: new Date(conv.lastMessageTime),
+              unreadCount: unreadCounts[conv.conversationId] || 0,
+              userType: userData.role || 'unknown',
+              avatar: userData.role === 'collector' ? '👷' : '🏠',
+            };
+          } catch {
+            return null;
+          }
+        })
+      );
+
+      const sorted = conversations
+        .filter(Boolean)
+        .sort((a, b) => b.timestamp - a.timestamp);
+
+      setConversations(sorted);
     } catch (error) {
       console.log('Error loading conversations:', error);
     } finally {
@@ -126,9 +170,9 @@ export default function MessagesScreen({ navigation }) {
             <TouchableOpacity
               key={conversation.id}
               style={styles.conversationCard}
-              onPress={() => navigation.navigate('ChatScreen', { 
-                recipientId: conversation.id,
-                recipientName: conversation.name
+              onPress={() => navigation.navigate('ChatScreen', {
+                recipientId: conversation.otherUserId,
+                recipientName: conversation.name,
               })}
             >
               <View style={styles.avatarContainer}>

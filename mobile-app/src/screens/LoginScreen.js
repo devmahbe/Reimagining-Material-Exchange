@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, sendPasswordResetEmail } from 'firebase/auth';
 import { auth, db } from '../config/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { useGoogleAuth, handleGoogleAuthResponse } from '../utils/googleAuth';
@@ -103,12 +103,25 @@ export default function LoginScreen({ navigation }) {
       } else if (error.code === 'auth/invalid-email') {
         errorMsg = 'ভুল ইমেইল ফরম্যাট';
       }
-      Alert.alert('ত্রুটi', errorMsg);
+      Alert.alert('ত্রুটি', errorMsg);
     } finally {
       setLoading(false);
     }
   };
   
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      Alert.alert('ইমেইল প্রয়োজন', 'পাসওয়ার্ড রিসেটের জন্য উপরে আপনার ইমেইল লিখুন');
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      Alert.alert('সফল ✅', 'পাসওয়ার্ড রিসেট লিংক আপনার ইমেইলে পাঠানো হয়েছে। ইনবক্স চেক করুন।');
+    } catch (error) {
+      Alert.alert('ত্রুটি', 'ইমেইল পাঠানো ব্যর্থ। সঠিক ইমেইল লিখে আবার চেষ্টা করুন।');
+    }
+  };
+
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
@@ -201,7 +214,7 @@ export default function LoginScreen({ navigation }) {
               />
             </View>
 
-            <TouchableOpacity style={styles.forgotPassword}>
+            <TouchableOpacity style={styles.forgotPassword} onPress={handleForgotPassword}>
               <Text style={styles.forgotPasswordText}>
                 {banglaText.forgotPassword}
               </Text>

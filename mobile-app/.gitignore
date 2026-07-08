@@ -17,3 +17,5 @@ web-build/
 # Temporary files
 *.log
 *.tmp
+package-lock.json/
+package.json/

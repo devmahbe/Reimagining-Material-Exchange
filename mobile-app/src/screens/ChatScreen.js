@@ -34,7 +34,8 @@ export default function ChatScreen({ navigation, route }) {
   const currentUser = auth.currentUser;
 
   useEffect(() => {
-    loadMessages();
+    const unsubscribe = loadMessages();
+    return () => { if (unsubscribe) unsubscribe(); };
   }, []);
 
   const loadMessages = () => {
