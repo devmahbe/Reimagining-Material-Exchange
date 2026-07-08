@@ -8,11 +8,67 @@ import {
   SafeAreaView,
   Linking,
   Alert,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { WebView } from 'react-native-webview';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import colors from '../../constants/colors';
+
+const buildMapHTML = (address) => {
+  const safeAddress = (address || 'Dhaka, Bangladesh').replace(/'/g, "\\'");
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    #map { height:100vh; width:100%; }
+    .loading { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+      font-family:sans-serif; font-size:14px; color:#555; z-index:1000; background:white;
+      padding:10px 20px; border-radius:20px; box-shadow:0 2px 8px rgba(0,0,0,0.2); }
+  </style>
+</head>
+<body>
+  <div class="loading" id="loader">📍 লোকেশন খুঁজছি...</div>
+  <div id="map"></div>
+  <script>
+    var map = L.map('map', { zoomControl: true }).setView([23.8103, 90.4125], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19
+    }).addTo(map);
+
+    var customIcon = L.divIcon({
+      html: '<div style="background:#2E7D32;width:32px;height:32px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3)"></div>',
+      iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -32], className: ''
+    });
+
+    var address = '${safeAddress}, Dhaka, Bangladesh';
+    fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(address) + '&format=json&limit=1',
+      { headers: { 'Accept-Language': 'bn,en', 'User-Agent': 'BhangariExchange/1.0' } }
+    )
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      document.getElementById('loader').style.display = 'none';
+      if (data && data.length > 0) {
+        var lat = parseFloat(data[0].lat), lon = parseFloat(data[0].lon);
+        map.setView([lat, lon], 16);
+        L.marker([lat, lon], { icon: customIcon }).addTo(map)
+          .bindPopup('<b>📍 পিকআপ ঠিকানা</b><br>' + '${safeAddress}').openPopup();
+      } else {
+        var marker = L.marker([23.8103, 90.4125], { icon: customIcon }).addTo(map)
+          .bindPopup('<b>📍 পিকআপ ঠিকানা</b><br>' + '${safeAddress}').openPopup();
+      }
+    })
+    .catch(function(){ document.getElementById('loader').style.display = 'none'; });
+  </script>
+</body>
+</html>`;
+};
 
 export default function TrackPickupScreen({ navigation, route }) {
   const { requestId } = route.params;
@@ -295,6 +351,22 @@ export default function TrackPickupScreen({ navigation, route }) {
             </View>
           )}
         </View>
+
+        {/* OpenStreetMap */}
+        {request.address && (
+          <View style={styles.mapCard}>
+            <Text style={styles.cardTitle}>🗺️ ঠিকানার মানচিত্র</Text>
+            <View style={styles.mapContainer}>
+              <WebView
+                source={{ html: buildMapHTML(request.address) }}
+                style={styles.map}
+                scrollEnabled={false}
+                originWhitelist={['*']}
+                javaScriptEnabled
+              />
+            </View>
+          </View>
+        )}
 
         {/* Show rating option if completed and not yet rated */}
         {request.status === 'completed' && !request.userRating && (
@@ -646,6 +718,25 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     color: colors.success,
+  },
+  mapCard: {
+    backgroundColor: 'white',
+    margin: 20,
+    marginTop: 0,
+    borderRadius: 16,
+    padding: 20,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8 },
+      android: { elevation: 4 },
+    }),
+  },
+  mapContainer: {
+    height: 220,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  map: {
+    flex: 1,
   },
   rateButton: {
     backgroundColor: colors.secondary,

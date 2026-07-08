@@ -6,13 +6,14 @@ import {
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db, auth } from '../../config/firebase';
 import colors from '../../constants/colors';
 
-export default function EarningsScreen({ navigation }) {
+export default function EarningsScreen({ navigation, route }) {
   const [earnings, setEarnings] = useState({
     today: 0,
     thisWeek: 0,
@@ -46,11 +47,11 @@ export default function EarningsScreen({ navigation }) {
         completedPickups.push({ id: doc.id, ...doc.data() });
       });
 
-      // Calculate earnings
-      const now = new Date();
-      const todayStart = new Date(now.setHours(0, 0, 0, 0));
-      const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      // Calculate earnings — create fresh dates to avoid mutation bugs
+      const nowRef = new Date();
+      const todayStart = new Date(nowRef.getFullYear(), nowRef.getMonth(), nowRef.getDate());
+      const weekStart = new Date(nowRef.getFullYear(), nowRef.getMonth(), nowRef.getDate() - nowRef.getDay());
+      const monthStart = new Date(nowRef.getFullYear(), nowRef.getMonth(), 1);
 
       const calculated = {
         today: 0,
@@ -96,20 +97,20 @@ export default function EarningsScreen({ navigation }) {
 
   const filterTransactions = () => {
     const now = new Date();
-    
+
     switch (filter) {
-      case 'today':
-        const todayStart = new Date(now.setHours(0, 0, 0, 0));
+      case 'today': {
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         return transactions.filter(t => new Date(t.date) >= todayStart);
-      
-      case 'week':
-        const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
+      }
+      case 'week': {
+        const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
         return transactions.filter(t => new Date(t.date) >= weekStart);
-      
-      case 'month':
+      }
+      case 'month': {
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
         return transactions.filter(t => new Date(t.date) >= monthStart);
-      
+      }
       default:
         return transactions;
     }
@@ -245,7 +246,10 @@ export default function EarningsScreen({ navigation }) {
         </View>
 
         {/* Withdrawal Banner */}
-        <TouchableOpacity style={styles.withdrawalBanner}>
+        <TouchableOpacity
+          style={styles.withdrawalBanner}
+          onPress={() => navigation.navigate('BKashPayment', { amount: earnings.total })}
+        >
           <LinearGradient
             colors={[colors.primary, colors.primaryLight]}
             style={styles.withdrawalGradient}

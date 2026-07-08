@@ -7,17 +7,53 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Switch,
+  Alert,
+  Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { signOut } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth } from '../config/firebase';
 import colors from '../constants/colors';
+
+const SETTINGS_KEY = '@bhangari_settings';
 
 export default function SettingsScreen({ navigation }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [autoAcceptEnabled, setAutoAcceptEnabled] = useState(false);
   const [locationEnabled, setLocationEnabled] = useState(true);
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      const saved = await AsyncStorage.getItem(SETTINGS_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setNotificationsEnabled(parsed.notificationsEnabled ?? true);
+        setSoundEnabled(parsed.soundEnabled ?? true);
+        setLocationEnabled(parsed.locationEnabled ?? true);
+      }
+    } catch (error) {
+      console.log('Error loading settings:', error);
+    }
+  };
+
+  const saveSetting = async (key, value) => {
+    try {
+      const saved = await AsyncStorage.getItem(SETTINGS_KEY);
+      const current = saved ? JSON.parse(saved) : {};
+      await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...current, [key]: value }));
+    } catch (error) {
+      console.log('Error saving setting:', error);
+    }
+  };
+
+  const handleToggle = (key, setter, value) => {
+    setter(value);
+    saveSetting(key, value);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -48,7 +84,7 @@ export default function SettingsScreen({ navigation }) {
             </View>
             <Switch
               value={notificationsEnabled}
-              onValueChange={setNotificationsEnabled}
+              onValueChange={(v) => handleToggle('notificationsEnabled', setNotificationsEnabled, v)}
               trackColor={{ false: colors.border, true: colors.primaryLight }}
               thumbColor={notificationsEnabled ? colors.primary : '#f4f3f4'}
             />
@@ -64,7 +100,7 @@ export default function SettingsScreen({ navigation }) {
             </View>
             <Switch
               value={soundEnabled}
-              onValueChange={setSoundEnabled}
+              onValueChange={(v) => handleToggle('soundEnabled', setSoundEnabled, v)}
               trackColor={{ false: colors.border, true: colors.primaryLight }}
               thumbColor={soundEnabled ? colors.primary : '#f4f3f4'}
             />
@@ -75,7 +111,10 @@ export default function SettingsScreen({ navigation }) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>অ্যাকাউন্ট</Text>
           
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity
+            style={styles.settingItem}
+            onPress={() => navigation.navigate('Profile')}
+          >
             <View style={styles.settingLeft}>
               <Text style={styles.settingIcon}>👤</Text>
               <View style={styles.settingTextContainer}>
@@ -86,7 +125,10 @@ export default function SettingsScreen({ navigation }) {
             <Text style={styles.arrow}>→</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity
+            style={styles.settingItem}
+            onPress={() => Alert.alert('পাসওয়ার্ড পরিবর্তন', 'প্রোফাইল স্ক্রিনে গিয়ে পাসওয়ার্ড পরিবর্তন করুন।')}
+          >
             <View style={styles.settingLeft}>
               <Text style={styles.settingIcon}>🔒</Text>
               <View style={styles.settingTextContainer}>
@@ -97,7 +139,10 @@ export default function SettingsScreen({ navigation }) {
             <Text style={styles.arrow}>→</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity
+            style={styles.settingItem}
+            onPress={() => Alert.alert('পেমেন্ট পদ্ধতি', 'আয় স্ক্রিন থেকে bKash উত্তোলন করতে পারবেন।')}
+          >
             <View style={styles.settingLeft}>
               <Text style={styles.settingIcon}>💳</Text>
               <View style={styles.settingTextContainer}>
@@ -134,7 +179,7 @@ export default function SettingsScreen({ navigation }) {
             </View>
             <Switch
               value={locationEnabled}
-              onValueChange={setLocationEnabled}
+              onValueChange={(v) => handleToggle('locationEnabled', setLocationEnabled, v)}
               trackColor={{ false: colors.border, true: colors.primaryLight }}
               thumbColor={locationEnabled ? colors.primary : '#f4f3f4'}
             />
@@ -156,7 +201,10 @@ export default function SettingsScreen({ navigation }) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>সহায়তা</Text>
           
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity
+            style={styles.settingItem}
+            onPress={() => Alert.alert('সাহায্য কেন্দ্র', '📌 সাধারণ প্রশ্নাবলী:\n\n• পিকআপ কীভাবে দিতে হয়: হোম স্ক্রিন থেকে "পিকআপ দিন" বাটন চাপুন\n• দাম কীভাবে ঠিক হয়: পিকআপের সময় সংগ্রাহক মূল্যায়ন করে দাম নির্ধারণ করেন\n• পেমেন্ট কীভাবে পাবো: সম্পন্ন পিকআপের পর bKash-এ পেমেন্ট পাবেন\n\nআরো সাহায্যের জন্য সাপোর্টে যোগাযোগ করুন।')}
+          >
             <View style={styles.settingLeft}>
               <Text style={styles.settingIcon}>❓</Text>
               <View style={styles.settingTextContainer}>
@@ -167,7 +215,10 @@ export default function SettingsScreen({ navigation }) {
             <Text style={styles.arrow}>→</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity
+            style={styles.settingItem}
+            onPress={() => Alert.alert('যোগাযোগ', 'ইমেইল: support@bhangari.com\nফোন: 01700-000000\nসময়: সকাল ৯টা - রাত ৯টা')}
+          >
             <View style={styles.settingLeft}>
               <Text style={styles.settingIcon}>💬</Text>
               <View style={styles.settingTextContainer}>
@@ -178,7 +229,10 @@ export default function SettingsScreen({ navigation }) {
             <Text style={styles.arrow}>→</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity
+            style={styles.settingItem}
+            onPress={() => Linking.openURL('https://play.google.com/store')}
+          >
             <View style={styles.settingLeft}>
               <Text style={styles.settingIcon}>⭐</Text>
               <View style={styles.settingTextContainer}>
@@ -194,7 +248,10 @@ export default function SettingsScreen({ navigation }) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>আইনি</Text>
           
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity
+            style={styles.settingItem}
+            onPress={() => Alert.alert('শর্তাবলী', 'ভাঙ্গারি এক্সচেঞ্জ ব্যবহার করে আপনি:\n\n• সঠিক তথ্য দিতে সম্মত হচ্ছেন\n• প্ল্যাটফর্মের নীতি মেনে চলতে সম্মত হচ্ছেন\n• মিথ্যা তথ্য দিলে অ্যাকাউন্ট বন্ধ হতে পারে')}
+          >
             <View style={styles.settingLeft}>
               <Text style={styles.settingIcon}>📋</Text>
               <View style={styles.settingTextContainer}>
@@ -204,7 +261,10 @@ export default function SettingsScreen({ navigation }) {
             <Text style={styles.arrow}>→</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity
+            style={styles.settingItem}
+            onPress={() => Alert.alert('গোপনীয়তা নীতি', 'আমরা আপনার ব্যক্তিগত তথ্য সুরক্ষিত রাখি। আপনার তথ্য তৃতীয় পক্ষের সাথে শেয়ার করা হয় না। তথ্য শুধু সার্ভিস প্রদানের জন্য ব্যবহৃত হয়।')}
+          >
             <View style={styles.settingLeft}>
               <Text style={styles.settingIcon}>🔐</Text>
               <View style={styles.settingTextContainer}>
