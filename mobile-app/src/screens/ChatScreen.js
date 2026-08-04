@@ -9,6 +9,7 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -20,6 +21,7 @@ import {
   addDoc,
   doc,
   updateDoc,
+  getDocs,
   serverTimestamp,
 } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
@@ -32,17 +34,28 @@ export default function ChatScreen({ navigation, route }) {
   const [loading, setLoading] = useState(true);
   const scrollViewRef = useRef();
   const currentUser = auth.currentUser;
+  const conversationId = [currentUser.uid, recipientId].sort().join('_');
 
   useEffect(() => {
+    markMessagesAsRead();
     const unsubscribe = loadMessages();
     return () => { if (unsubscribe) unsubscribe(); };
   }, []);
 
-  const loadMessages = () => {
-    // Create conversation ID (sorted to ensure consistency)
-    const conversationId = [currentUser.uid, recipientId].sort().join('_');
+  const markMessagesAsRead = async () => {
+    try {
+      const unreadQ = query(
+        collection(db, 'messages'),
+        where('conversationId', '==', conversationId),
+        where('recipientId', '==', currentUser.uid),
+        where('read', '==', false)
+      );
+      const snap = await getDocs(unreadQ);
+      await Promise.all(snap.docs.map(d => updateDoc(d.ref, { read: true })));
+    } catch (_) {}
+  };
 
-    // Real-time listener for messages
+  const loadMessages = () => {
     const q = query(
       collection(db, 'messages'),
       where('conversationId', '==', conversationId),
@@ -51,13 +64,19 @@ export default function ChatScreen({ navigation, route }) {
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const msgs = [];
-      snapshot.forEach((doc) => {
-        msgs.push({ id: doc.id, ...doc.data() });
+      snapshot.forEach((d) => {
+        msgs.push({ id: d.id, ...d.data() });
       });
       setMessages(msgs);
       setLoading(false);
-      
-      // Scroll to bottom
+
+      // Mark any newly arrived incoming messages as read
+      const unreadDocs = snapshot.docs.filter(d => {
+        const data = d.data();
+        return data.recipientId === currentUser.uid && data.read === false;
+      });
+      unreadDocs.forEach(d => updateDoc(d.ref, { read: true }).catch(() => {}));
+
       setTimeout(() => {
         scrollViewRef.current?.scrollToEnd({ animated: true });
       }, 100);
@@ -68,8 +87,6 @@ export default function ChatScreen({ navigation, route }) {
 
   const sendMessage = async () => {
     if (!newMessage.trim()) return;
-
-    const conversationId = [currentUser.uid, recipientId].sort().join('_');
     
     try {
       await addDoc(collection(db, 'messages'), {
@@ -127,7 +144,7 @@ export default function ChatScreen({ navigation, route }) {
           </View>
           <View>
             <Text style={styles.headerTitle}>{recipientName}</Text>
-            <Text style={styles.headerStatus}>অনলাইন</Text>
+            <Text style={styles.headerStatus}>ভাঙ্গারি এক্সচেঞ্জ ব্যবহারকারী</Text>
           </View>
         </View>
         <TouchableOpacity onPress={() => {}}>
@@ -214,7 +231,10 @@ export default function ChatScreen({ navigation, route }) {
 
         {/* Input Area */}
         <View style={styles.inputContainer}>
-          <TouchableOpacity style={styles.attachButton}>
+          <TouchableOpacity
+            style={styles.attachButton}
+            onPress={() => Alert.alert('সংযুক্তি', 'ছবি পাঠাতে প্রথমে পিকআপ অনুরোধ তৈরি করুন, সেখান থেকে ছবি যুক্ত করা যাবে।')}
+          >
             <Text style={styles.attachIcon}>📎</Text>
           </TouchableOpacity>
           
