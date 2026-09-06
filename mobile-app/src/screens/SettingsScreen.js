@@ -11,6 +11,7 @@ import {
   Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth } from '../config/firebase';
 import colors from '../constants/colors';
@@ -58,15 +59,12 @@ export default function SettingsScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <LinearGradient
-        colors={[colors.primary, colors.primaryLight]}
-        style={styles.header}
-      >
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>← ফিরুন</Text>
+      <LinearGradient colors={[colors.primaryDark, colors.primary]} style={styles.header}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={22} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>সেটিংস</Text>
-        <View style={{ width: 60 }} />
+        <View style={{ width: 40 }} />
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -76,7 +74,7 @@ export default function SettingsScreen({ navigation }) {
           
           <View style={styles.settingItem}>
             <View style={styles.settingLeft}>
-              <Text style={styles.settingIcon}>🔔</Text>
+              <Ionicons name="notifications-outline" size={22} color={colors.primary} style={styles.settingIcon} />
               <View style={styles.settingTextContainer}>
                 <Text style={styles.settingTitle}>পুশ বিজ্ঞপ্তি</Text>
                 <Text style={styles.settingSubtitle}>অনুরোধ আপডেট পান</Text>
@@ -92,7 +90,7 @@ export default function SettingsScreen({ navigation }) {
 
           <View style={styles.settingItem}>
             <View style={styles.settingLeft}>
-              <Text style={styles.settingIcon}>🔊</Text>
+              <Ionicons name="volume-medium-outline" size={22} color={colors.primary} style={styles.settingIcon} />
               <View style={styles.settingTextContainer}>
                 <Text style={styles.settingTitle}>বিজ্ঞপ্তি সাউন্ড</Text>
                 <Text style={styles.settingSubtitle}>নতুন বার্তায় শব্দ</Text>
@@ -116,13 +114,13 @@ export default function SettingsScreen({ navigation }) {
             onPress={() => navigation.navigate('Profile')}
           >
             <View style={styles.settingLeft}>
-              <Text style={styles.settingIcon}>👤</Text>
+              <Ionicons name="person-outline" size={22} color={colors.primary} style={styles.settingIcon} />
               <View style={styles.settingTextContainer}>
                 <Text style={styles.settingTitle}>প্রোফাইল সম্পাদনা</Text>
                 <Text style={styles.settingSubtitle}>নাম, ঠিকানা, ফোন</Text>
               </View>
             </View>
-            <Text style={styles.arrow}>→</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -130,7 +128,7 @@ export default function SettingsScreen({ navigation }) {
             onPress={() => Alert.alert('পাসওয়ার্ড পরিবর্তন', 'প্রোফাইল স্ক্রিনে গিয়ে পাসওয়ার্ড পরিবর্তন করুন।')}
           >
             <View style={styles.settingLeft}>
-              <Text style={styles.settingIcon}>🔒</Text>
+              <Ionicons name="lock-closed-outline" size={22} color={colors.primary} style={styles.settingIcon} />
               <View style={styles.settingTextContainer}>
                 <Text style={styles.settingTitle}>পাসওয়ার্ড পরিবর্তন</Text>
                 <Text style={styles.settingSubtitle}>নিরাপত্তা আপডেট</Text>
@@ -144,7 +142,7 @@ export default function SettingsScreen({ navigation }) {
             onPress={() => Alert.alert('পেমেন্ট পদ্ধতি', 'আয় স্ক্রিন থেকে bKash উত্তোলন করতে পারবেন।')}
           >
             <View style={styles.settingLeft}>
-              <Text style={styles.settingIcon}>💳</Text>
+              <Ionicons name="card-outline" size={22} color={colors.primary} style={styles.settingIcon} />
               <View style={styles.settingTextContainer}>
                 <Text style={styles.settingTitle}>পেমেন্ট পদ্ধতি</Text>
                 <Text style={styles.settingSubtitle}>bKash, Rocket যোগ করুন</Text>
@@ -160,7 +158,7 @@ export default function SettingsScreen({ navigation }) {
           
           <TouchableOpacity style={styles.settingItem}>
             <View style={styles.settingLeft}>
-              <Text style={styles.settingIcon}>🌐</Text>
+              <Ionicons name="globe-outline" size={22} color={colors.primary} style={styles.settingIcon} />
               <View style={styles.settingTextContainer}>
                 <Text style={styles.settingTitle}>ভাষা</Text>
                 <Text style={styles.settingSubtitle}>বাংলা</Text>
@@ -171,7 +169,7 @@ export default function SettingsScreen({ navigation }) {
 
           <View style={styles.settingItem}>
             <View style={styles.settingLeft}>
-              <Text style={styles.settingIcon}>📍</Text>
+              <Ionicons name="location-outline" size={22} color={colors.primary} style={styles.settingIcon} />
               <View style={styles.settingTextContainer}>
                 <Text style={styles.settingTitle}>লোকেশন অ্যাক্সেস</Text>
                 <Text style={styles.settingSubtitle}>নিকটবর্তী সংগ্রাহক খুঁজুন</Text>
@@ -187,7 +185,7 @@ export default function SettingsScreen({ navigation }) {
 
           <TouchableOpacity style={styles.settingItem}>
             <View style={styles.settingLeft}>
-              <Text style={styles.settingIcon}>🎨</Text>
+              <Ionicons name="color-palette-outline" size={22} color={colors.primary} style={styles.settingIcon} />
               <View style={styles.settingTextContainer}>
                 <Text style={styles.settingTitle}>থিম</Text>
                 <Text style={styles.settingSubtitle}>লাইট মোড</Text>
@@ -206,7 +204,7 @@ export default function SettingsScreen({ navigation }) {
             onPress={() => Alert.alert('সাহায্য কেন্দ্র', '📌 সাধারণ প্রশ্নাবলী:\n\n• পিকআপ কীভাবে দিতে হয়: হোম স্ক্রিন থেকে "পিকআপ দিন" বাটন চাপুন\n• দাম কীভাবে ঠিক হয়: পিকআপের সময় সংগ্রাহক মূল্যায়ন করে দাম নির্ধারণ করেন\n• পেমেন্ট কীভাবে পাবো: সম্পন্ন পিকআপের পর bKash-এ পেমেন্ট পাবেন\n\nআরো সাহায্যের জন্য সাপোর্টে যোগাযোগ করুন।')}
           >
             <View style={styles.settingLeft}>
-              <Text style={styles.settingIcon}>❓</Text>
+              <Ionicons name="help-circle-outline" size={22} color="#3B82F6" style={styles.settingIcon} />
               <View style={styles.settingTextContainer}>
                 <Text style={styles.settingTitle}>সাহায্য কেন্দ্র</Text>
                 <Text style={styles.settingSubtitle}>FAQ এবং গাইড</Text>
@@ -220,7 +218,7 @@ export default function SettingsScreen({ navigation }) {
             onPress={() => Alert.alert('যোগাযোগ', 'ইমেইল: support@bhangari.com\nফোন: 01700-000000\nসময়: সকাল ৯টা - রাত ৯টা')}
           >
             <View style={styles.settingLeft}>
-              <Text style={styles.settingIcon}>💬</Text>
+              <Ionicons name="chatbubble-outline" size={22} color="#3B82F6" style={styles.settingIcon} />
               <View style={styles.settingTextContainer}>
                 <Text style={styles.settingTitle}>আমাদের সাথে যোগাযোগ</Text>
                 <Text style={styles.settingSubtitle}>সাপোর্ট টিম</Text>
@@ -234,7 +232,7 @@ export default function SettingsScreen({ navigation }) {
             onPress={() => Linking.openURL('https://play.google.com/store')}
           >
             <View style={styles.settingLeft}>
-              <Text style={styles.settingIcon}>⭐</Text>
+              <Ionicons name="star-outline" size={22} color={colors.accent} style={styles.settingIcon} />
               <View style={styles.settingTextContainer}>
                 <Text style={styles.settingTitle}>অ্যাপ রেটিং দিন</Text>
                 <Text style={styles.settingSubtitle}>Play Store এ রিভিউ</Text>
@@ -253,7 +251,7 @@ export default function SettingsScreen({ navigation }) {
             onPress={() => Alert.alert('শর্তাবলী', 'ভাঙ্গারি এক্সচেঞ্জ ব্যবহার করে আপনি:\n\n• সঠিক তথ্য দিতে সম্মত হচ্ছেন\n• প্ল্যাটফর্মের নীতি মেনে চলতে সম্মত হচ্ছেন\n• মিথ্যা তথ্য দিলে অ্যাকাউন্ট বন্ধ হতে পারে')}
           >
             <View style={styles.settingLeft}>
-              <Text style={styles.settingIcon}>📋</Text>
+              <Ionicons name="document-text-outline" size={22} color={colors.textGray} style={styles.settingIcon} />
               <View style={styles.settingTextContainer}>
                 <Text style={styles.settingTitle}>শর্তাবলী</Text>
               </View>
@@ -266,7 +264,7 @@ export default function SettingsScreen({ navigation }) {
             onPress={() => Alert.alert('গোপনীয়তা নীতি', 'আমরা আপনার ব্যক্তিগত তথ্য সুরক্ষিত রাখি। আপনার তথ্য তৃতীয় পক্ষের সাথে শেয়ার করা হয় না। তথ্য শুধু সার্ভিস প্রদানের জন্য ব্যবহৃত হয়।')}
           >
             <View style={styles.settingLeft}>
-              <Text style={styles.settingIcon}>🔐</Text>
+              <Ionicons name="shield-checkmark-outline" size={22} color={colors.textGray} style={styles.settingIcon} />
               <View style={styles.settingTextContainer}>
                 <Text style={styles.settingTitle}>গোপনীয়তা নীতি</Text>
               </View>
@@ -281,7 +279,7 @@ export default function SettingsScreen({ navigation }) {
           
           <View style={styles.settingItem}>
             <View style={styles.settingLeft}>
-              <Text style={styles.settingIcon}>ℹ️</Text>
+              <Ionicons name="information-circle-outline" size={22} color={colors.textGray} style={styles.settingIcon} />
               <View style={styles.settingTextContainer}>
                 <Text style={styles.settingTitle}>অ্যাপ ভার্সন</Text>
                 <Text style={styles.settingSubtitle}>v1.0.0</Text>
@@ -291,7 +289,7 @@ export default function SettingsScreen({ navigation }) {
 
           <View style={styles.settingItem}>
             <View style={styles.settingLeft}>
-              <Text style={styles.settingIcon}>👥</Text>
+              <Ionicons name="people-outline" size={22} color={colors.textGray} style={styles.settingIcon} />
               <View style={styles.settingTextContainer}>
                 <Text style={styles.settingTitle}>ডেভেলপার</Text>
                 <Text style={styles.settingSubtitle}>Team: Doctor Strange, Section B</Text>
@@ -318,10 +316,10 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 20,
   },
-  backButton: {
-    fontSize: 16,
-    color: 'white',
-    fontWeight: '600',
+  backBtn: {
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center', alignItems: 'center',
   },
   headerTitle: {
     fontSize: 18,
@@ -359,9 +357,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   settingIcon: {
-    fontSize: 24,
-    marginRight: 15,
-    width: 30,
+    marginRight: 14,
+    width: 26,
+    textAlign: 'center',
   },
   settingTextContainer: {
     flex: 1,
@@ -377,8 +375,8 @@ const styles = StyleSheet.create({
     color: colors.textGray,
   },
   arrow: {
-    fontSize: 18,
     color: colors.textLight,
-    marginLeft: 10,
+    marginLeft: 4,
   },
 });
+

@@ -17,15 +17,13 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
 import colors from '../constants/colors';
 
-// ─── bKash Sandbox Config ────────────────────────────────────────────────────
-// Register at https://developer.bka.sh/ to get sandbox credentials.
-// Replace the placeholders below with your actual sandbox values.
+
 const BKASH_CONFIG = {
-  baseURL: 'https://tokenized.sandbox.bka.sh/v1.2.0-beta',
-  appKey: 'YOUR_SANDBOX_APP_KEY',       // from developer.bka.sh
-  appSecret: 'YOUR_SANDBOX_APP_SECRET', // from developer.bka.sh
-  username: 'YOUR_SANDBOX_USERNAME',    // from developer.bka.sh
-  password: 'YOUR_SANDBOX_PASSWORD',    // from developer.bka.sh
+  baseURL: process.env.EXPO_PUBLIC_BKASH_BASE_URL || 'https://tokenized.sandbox.bka.sh/v1.2.0-beta',
+  appKey:    process.env.EXPO_PUBLIC_BKASH_APP_KEY     || '',
+  appSecret: process.env.EXPO_PUBLIC_BKASH_APP_SECRET  || '',
+  username:  process.env.EXPO_PUBLIC_BKASH_USERNAME    || '',
+  password:  process.env.EXPO_PUBLIC_BKASH_PASSWORD    || '',
 };
 
 const STEPS = {
@@ -49,7 +47,7 @@ export default function BKashPaymentScreen({ navigation, route }) {
   const [idToken, setIdToken] = useState('');
   const [paymentID, setPaymentID] = useState('');
 
-  const isSandboxConfigured = !BKASH_CONFIG.appKey.startsWith('YOUR_');
+  const isSandboxConfigured = BKASH_CONFIG.appKey.length > 0;
 
   // ── Step 1: Grant Token ────────────────────────────────────────────────────
   const grantToken = async () => {

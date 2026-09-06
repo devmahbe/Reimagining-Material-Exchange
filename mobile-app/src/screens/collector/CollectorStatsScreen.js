@@ -7,43 +7,157 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, orderBy } from 'firebase/firestore';
 import { db, auth } from '../../config/firebase';
 import colors from '../../constants/colors';
 
 const screenWidth = Dimensions.get('window').width;
 
+const WEEK_DAYS = ['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহ', 'শুক্র', 'শনি'];
+const WEEK_LABELS = ['W1', 'W2', 'W3', 'W4'];
+const MONTH_LABELS = ['জানু', 'ফেব্রু', 'মার্চ', 'এপ্রি', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টে', 'অক্টো', 'নভে', 'ডিসে'];
+
 export default function CollectorStatsScreen({ navigation }) {
-  const [period, setPeriod] = useState('week'); // week, month, year
+  const [period, setPeriod] = useState('week');
+  const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
-    totalEarnings: 2850,
-    totalPickups: 23,
-    totalWeight: 145,
-    averageRating: 4.8,
-    completionRate: 95,
+    totalEarnings: 0,
+    totalPickups: 0,
+    totalWeight: 0,
+    averageRating: 0,
+    completionRate: 0,
   });
+  const [earningsData, setEarningsData] = useState(
+    WEEK_DAYS.map(day => ({ day, amount: 0 }))
+  );
+  const [topMaterials, setTopMaterials] = useState([]);
 
-  const [earningsData, setEarningsData] = useState([
-    { day: 'রবি', amount: 450 },
-    { day: 'সোম', amount: 320 },
-    { day: 'মঙ্গল', amount: 580 },
-    { day: 'বুধ', amount: 410 },
-    { day: 'বৃহ', amount: 490 },
-    { day: 'শুক্র', amount: 380 },
-    { day: 'শনি', amount: 220 },
-  ]);
+  useEffect(() => {
+    loadStats(period);
+  }, [period]);
 
-  const [topMaterials, setTopMaterials] = useState([
-    { name: 'কাগজ', weight: 45, earnings: 450, percentage: 35 },
-    { name: 'প্লাস্টিক', weight: 38, earnings: 760, percentage: 28 },
-    { name: 'ধাতু', weight: 25, earnings: 1250, percentage: 20 },
-    { name: 'ইলেকট্রনিক্স', weight: 12, earnings: 600, percentage: 10 },
-    { name: 'কাপড়', weight: 25, earnings: 250, percentage: 7 },
-  ]);
+  const loadStats = async (selectedPeriod) => {
+    setLoading(true);
+    try {
+      const user = auth.currentUser;
+      const now = new Date();
+      let startDate;
 
-  const getMaxEarning = () => Math.max(...earningsData.map(d => d.amount));
+      if (selectedPeriod === 'week') {
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+      } else if (selectedPeriod === 'month') {
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      } else {
+        startDate = new Date(now.getFullYear(), 0, 1);
+      }
+
+      // All completed pickups by this collector
+      const completedSnap = await getDocs(query(
+        collection(db, 'pickupRequests'),
+        where('collectorId', '==', user.uid),
+        where('status', '==', 'completed'),
+        orderBy('completedAt', 'desc')
+      ));
+      const allCompleted = completedSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // Filter to current period
+      const periodPickups = allCompleted.filter(p =>
+        p.completedAt && new Date(p.completedAt) >= startDate
+      );
+
+      // Pending/active pickups for completion rate
+      const activeSnap = await getDocs(query(
+        collection(db, 'pickupRequests'),
+        where('collectorId', '==', user.uid),
+        where('status', 'in', ['accepted', 'on-the-way', 'at-location'])
+      ));
+
+      // Aggregate stats
+      let totalEarnings = 0;
+      let totalWeight = 0;
+      const materialMap = {};
+      const chartMap = {};
+
+      periodPickups.forEach(p => {
+        const earnings = p.actualEarnings || p.estimatedEarnings || 0;
+        totalEarnings += earnings;
+
+        // Chart key
+        const date = new Date(p.completedAt);
+        let key;
+        if (selectedPeriod === 'week') {
+          key = WEEK_DAYS[date.getDay()];
+        } else if (selectedPeriod === 'month') {
+          key = `W${Math.ceil(date.getDate() / 7)}`;
+        } else {
+          key = MONTH_LABELS[date.getMonth()];
+        }
+        chartMap[key] = (chartMap[key] || 0) + earnings;
+
+        // Materials
+        (p.materials || []).forEach(m => {
+          const qty = parseFloat(m.quantity) || 0;
+          const price = parseFloat(String(m.price || '0').replace(/[^0-9.]/g, '')) || 0;
+          const mat = materialMap[m.name] || { name: m.name, weight: 0, earnings: 0 };
+          mat.weight += qty;
+          mat.earnings += price * qty;
+          if (m.unit === 'কেজি' || m.unit === 'kg') totalWeight += qty;
+          materialMap[m.name] = mat;
+        });
+      });
+
+      // Build chart data
+      let chartData;
+      if (selectedPeriod === 'week') {
+        chartData = WEEK_DAYS.map(day => ({ day, amount: chartMap[day] || 0 }));
+      } else if (selectedPeriod === 'month') {
+        chartData = WEEK_LABELS.map(w => ({ day: w, amount: chartMap[w] || 0 }));
+      } else {
+        chartData = MONTH_LABELS.map(m => ({ day: m, amount: chartMap[m] || 0 }));
+      }
+      setEarningsData(chartData);
+
+      // Top materials
+      const sorted = Object.values(materialMap)
+        .sort((a, b) => b.earnings - a.earnings)
+        .slice(0, 5);
+      const totalMaterialEarnings = sorted.reduce((s, m) => s + m.earnings, 0);
+      setTopMaterials(sorted.map(m => ({
+        ...m,
+        earnings: Math.round(m.earnings),
+        weight: Math.round(m.weight * 10) / 10,
+        percentage: totalMaterialEarnings > 0
+          ? Math.round((m.earnings / totalMaterialEarnings) * 100) : 0,
+      })));
+
+      // User rating
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      const userData = userDoc.data() || {};
+      const completionRate = (activeSnap.size + periodPickups.length) > 0
+        ? Math.round((periodPickups.length / (activeSnap.size + periodPickups.length)) * 100)
+        : (periodPickups.length > 0 ? 100 : 0);
+
+      setStats({
+        totalEarnings,
+        totalPickups: periodPickups.length,
+        totalWeight: Math.round(totalWeight * 10) / 10,
+        averageRating: userData.rating ? parseFloat(userData.rating.toFixed(1)) : 0,
+        completionRate,
+      });
+    } catch (error) {
+      console.log('Error loading stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getMaxEarning = () => {
+    const max = Math.max(...earningsData.map(d => d.amount));
+    return max > 0 ? max : 1;
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -87,6 +201,13 @@ export default function CollectorStatsScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>লোড হচ্ছে...</Text>
+        </View>
+      ) : null}
+
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Main Stats Cards */}
         <View style={styles.statsGrid}>
@@ -95,9 +216,11 @@ export default function CollectorStatsScreen({ navigation }) {
             style={styles.mainStatCard}
           >
             <Text style={styles.mainStatIcon}>💰</Text>
-            <Text style={styles.mainStatValue}>৳{stats.totalEarnings}</Text>
+            <Text style={styles.mainStatValue}>৳{stats.totalEarnings.toLocaleString('bn-BD')}</Text>
             <Text style={styles.mainStatLabel}>মোট আয়</Text>
-            <Text style={styles.mainStatSubtext}>এই সপ্তাহ</Text>
+            <Text style={styles.mainStatSubtext}>
+              {period === 'week' ? 'এই সপ্তাহ' : period === 'month' ? 'এই মাস' : 'এই বছর'}
+            </Text>
           </LinearGradient>
 
           <View style={styles.miniStatsColumn}>
@@ -203,30 +326,30 @@ export default function CollectorStatsScreen({ navigation }) {
         {/* Quick Stats */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>অন্যান্য তথ্য</Text>
-          
+
           <View style={styles.quickStatsGrid}>
             <View style={styles.quickStatCard}>
-              <Text style={styles.quickStatIcon}>🏆</Text>
-              <Text style={styles.quickStatValue}>12</Text>
-              <Text style={styles.quickStatLabel}>সেরা সংগ্রাহক ব্যাজ</Text>
+              <Text style={styles.quickStatIcon}>📦</Text>
+              <Text style={styles.quickStatValue}>{stats.totalPickups}</Text>
+              <Text style={styles.quickStatLabel}>মোট পিকআপ</Text>
             </View>
 
             <View style={styles.quickStatCard}>
-              <Text style={styles.quickStatIcon}>👥</Text>
-              <Text style={styles.quickStatValue}>45</Text>
-              <Text style={styles.quickStatLabel}>সক্রিয় গ্রাহক</Text>
+              <Text style={styles.quickStatIcon}>⚖️</Text>
+              <Text style={styles.quickStatValue}>{stats.totalWeight} kg</Text>
+              <Text style={styles.quickStatLabel}>মোট ওজন</Text>
             </View>
 
             <View style={styles.quickStatCard}>
-              <Text style={styles.quickStatIcon}>📍</Text>
-              <Text style={styles.quickStatValue}>8.5 km</Text>
-              <Text style={styles.quickStatLabel}>গড় দূরত্ব</Text>
+              <Text style={styles.quickStatIcon}>⭐</Text>
+              <Text style={styles.quickStatValue}>{stats.averageRating || '—'}</Text>
+              <Text style={styles.quickStatLabel}>রেটিং</Text>
             </View>
 
             <View style={styles.quickStatCard}>
-              <Text style={styles.quickStatIcon}>⏱️</Text>
-              <Text style={styles.quickStatValue}>25 মিনিট</Text>
-              <Text style={styles.quickStatLabel}>গড় সময়</Text>
+              <Text style={styles.quickStatIcon}>✓</Text>
+              <Text style={styles.quickStatValue}>{stats.completionRate}%</Text>
+              <Text style={styles.quickStatLabel}>সম্পন্ন হার</Text>
             </View>
           </View>
         </View>
@@ -258,6 +381,15 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: 'white',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingTop: 20,
+  },
+  loadingText: {
+    marginTop: 8,
+    color: colors.textGray,
+    fontSize: 14,
   },
   periodSelector: {
     flexDirection: 'row',

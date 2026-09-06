@@ -7,8 +7,10 @@ import {
   TouchableOpacity,
   SafeAreaView,
   TextInput,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { collection, query, where, getDocs, orderBy, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
 import colors from '../constants/colors';
@@ -128,17 +130,17 @@ export default function MessagesScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <LinearGradient
-        colors={[colors.primary, colors.primaryLight]}
-        style={styles.header}
-      >
+      <LinearGradient colors={[colors.primaryDark, colors.primary]} style={styles.header}>
         <View style={styles.headerTop}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.backButton}>← ফিরুন</Text>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={22} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>বার্তা</Text>
-          <TouchableOpacity onPress={() => {}}>
-            <Text style={styles.headerIcon}>✏️</Text>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => Alert.alert('নতুন বার্তা', 'পিকআপ অনুরোধ গ্রহণ করার পর সংগ্রাহক বা গৃহস্থালির সাথে বার্তা চালু হয়।')}
+          >
+            <Ionicons name="create-outline" size={22} color="#fff" />
           </TouchableOpacity>
         </View>
 
@@ -216,16 +218,33 @@ export default function MessagesScreen({ navigation }) {
 
       {/* Quick Actions */}
       <View style={styles.quickActions}>
-        <TouchableOpacity style={styles.quickActionButton}>
-          <Text style={styles.quickActionIcon}>🏠</Text>
+        <TouchableOpacity
+          style={styles.quickActionButton}
+          onPress={() => {
+            const householdConvs = conversations.filter(c => c.userType === 'household');
+            if (householdConvs.length === 0)
+              Alert.alert('পরিবার', 'কোন পরিবারের সাথে কথোপকথন নেই। পিকআপ অনুরোধ গ্রহণ করলে যোগাযোগ শুরু হবে।');
+          }}
+        >
+          <Ionicons name="home-outline" size={26} color={colors.primary} style={{ marginBottom: 4 }} />
           <Text style={styles.quickActionLabel}>পরিবার</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.quickActionButton}>
-          <Text style={styles.quickActionIcon}>👷</Text>
+        <TouchableOpacity
+          style={styles.quickActionButton}
+          onPress={() => {
+            const collectorConvs = conversations.filter(c => c.userType === 'collector');
+            if (collectorConvs.length === 0)
+              Alert.alert('সংগ্রাহক', 'কোন সংগ্রাহকের সাথে কথোপকথন নেই।');
+          }}
+        >
+          <Ionicons name="construct-outline" size={26} color={colors.primary} style={{ marginBottom: 4 }} />
           <Text style={styles.quickActionLabel}>সংগ্রাহক</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.quickActionButton}>
-          <Text style={styles.quickActionIcon}>❓</Text>
+        <TouchableOpacity
+          style={styles.quickActionButton}
+          onPress={() => Alert.alert('সাপোর্ট', 'ইমেইল: support@bhangari.com\nফোন: 01700-000000\nসময়: সকাল ৯টা – রাত ৯টা')}
+        >
+          <Ionicons name="help-circle-outline" size={26} color="#3B82F6" style={{ marginBottom: 4 }} />
           <Text style={styles.quickActionLabel}>সাপোর্ট</Text>
         </TouchableOpacity>
       </View>
@@ -249,10 +268,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 15,
   },
-  backButton: {
-    fontSize: 16,
-    color: 'white',
-    fontWeight: '600',
+  backBtn: {
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center', alignItems: 'center',
   },
   headerTitle: {
     fontSize: 18,
@@ -399,7 +418,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   quickActionIcon: {
-    fontSize: 28,
+    fontSize: 26,
     marginBottom: 5,
   },
   quickActionLabel: {

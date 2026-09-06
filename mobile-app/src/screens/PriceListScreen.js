@@ -12,6 +12,10 @@ import colors from '../constants/colors';
 
 export default function PriceListScreen({ navigation }) {
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [lastUpdated, setLastUpdated] = useState(() => {
+    const now = new Date();
+    return `আজ ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
+  });
 
   const categories = [
     { id: 'all', name: 'সব', icon: '📦' },
@@ -111,7 +115,10 @@ export default function PriceListScreen({ navigation }) {
           <Text style={styles.backButton}>← ফিরুন</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>আজকের দর</Text>
-        <TouchableOpacity onPress={() => {}}>
+        <TouchableOpacity onPress={() => {
+          const now = new Date();
+          setLastUpdated(`আজ ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`);
+        }}>
           <Text style={styles.refreshIcon}>🔄</Text>
         </TouchableOpacity>
       </LinearGradient>
@@ -119,7 +126,7 @@ export default function PriceListScreen({ navigation }) {
       {/* Update Notice */}
       <View style={styles.updateNotice}>
         <Text style={styles.updateIcon}>⏰</Text>
-        <Text style={styles.updateText}>সর্বশেষ আপডেট: আজ সকাল ৯:০০</Text>
+        <Text style={styles.updateText}>সর্বশেষ আপডেট: {lastUpdated}</Text>
       </View>
 
       {/* Category Filter */}

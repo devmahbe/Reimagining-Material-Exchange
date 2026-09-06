@@ -8,6 +8,8 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { db, auth } from '../config/firebase';
 import colors from '../constants/colors';
 
 export default function NotificationsScreen({ navigation }) {
@@ -18,82 +20,116 @@ export default function NotificationsScreen({ navigation }) {
     loadNotifications();
   }, []);
 
-  const loadNotifications = () => {
-    // Mock notifications - in real app, fetch from Firestore
-    const mockNotifications = [
-      {
-        id: '1',
-        type: 'pickup_accepted',
-        title: 'পিকআপ গৃহীত হয়েছে',
-        message: 'রহিম সংগ্রাহক আপনার পিকআপ অনুরোধটি গ্রহণ করেছেন',
-        timestamp: new Date(Date.now() - 600000), // 10 min ago
-        read: false,
-        icon: '✅',
-        color: '#4CAF50',
-      },
-      {
-        id: '2',
-        type: 'pickup_completed',
-        title: 'পিকআপ সম্পন্ন',
-        message: 'আপনার ১৫ জানুয়ারির পিকআপ সফলভাবে সম্পন্ন হয়েছে। মোট: ৳২৫০',
-        timestamp: new Date(Date.now() - 3600000), // 1 hour ago
-        read: false,
-        icon: '✓',
-        color: '#4CAF50',
-      },
-      {
-        id: '3',
-        type: 'price_update',
-        title: 'দাম আপডেট',
-        message: 'প্লাস্টিক বোতলের দাম বেড়েছে: এখন ৳২০-২৫/কেজি',
-        timestamp: new Date(Date.now() - 7200000), // 2 hours ago
-        read: true,
-        icon: '📈',
-        color: '#FF9800',
-      },
-      {
-        id: '4',
-        type: 'payment',
-        title: 'পেমেন্ট সফল',
-        message: 'আপনার ওয়ালেটে ৳২৫০ যোগ হয়েছে',
-        timestamp: new Date(Date.now() - 86400000), // 1 day ago
-        read: true,
-        icon: '💰',
-        color: '#2196F3',
-      },
-      {
-        id: '5',
-        type: 'reminder',
-        title: 'পিকআপ রিমাইন্ডার',
-        message: 'আগামীকাল সকাল ১০:০০ এ আপনার পিকআপ নির্ধারিত আছে',
-        timestamp: new Date(Date.now() - 172800000), // 2 days ago
-        read: true,
-        icon: '⏰',
-        color: '#9C27B0',
-      },
-      {
-        id: '6',
-        type: 'new_feature',
-        title: 'নতুন ফিচার',
-        message: 'এখন আপনি সরাসরি অ্যাপ থেকে সংগ্রাহকদের রেটিং দিতে পারবেন',
-        timestamp: new Date(Date.now() - 259200000), // 3 days ago
-        read: true,
-        icon: '🎉',
-        color: '#E91E63',
-      },
-      {
-        id: '7',
-        type: 'system',
-        title: 'সিস্টেম মেইনটেন্যান্স',
-        message: 'আগামী রবিবার রাত ২:00 থেকে ৪:00 পর্যন্ত সিস্টেম আপডেট হবে',
-        timestamp: new Date(Date.now() - 345600000), // 4 days ago
-        read: true,
-        icon: '🔧',
-        color: '#607D8B',
-      },
-    ];
+  const loadNotifications = async () => {
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
 
-    setNotifications(mockNotifications);
+      const generated = [];
+
+      // Household: notifications from their own pickup requests
+      const householdSnap = await getDocs(query(
+        collection(db, 'pickupRequests'),
+        where('userId', '==', user.uid),
+        orderBy('createdAt', 'desc')
+      ));
+
+      householdSnap.forEach((d) => {
+        const req = { id: d.id, ...d.data() };
+
+        // Pickup submitted
+        generated.push({
+          id: `submitted_${req.id}`,
+          type: 'pickup_submitted',
+          title: 'পিকআপ অনুরোধ জমা',
+          message: 'আপনার পিকআপ অনুরোধ সফলভাবে জমা হয়েছে',
+          timestamp: new Date(req.createdAt),
+          read: true,
+          icon: '📦',
+          color: '#2196F3',
+        });
+
+        if (req.acceptedAt) {
+          generated.push({
+            id: `accepted_${req.id}`,
+            type: 'pickup_accepted',
+            title: 'পিকআপ গৃহীত হয়েছে',
+            message: `${req.collectorName || 'একজন সংগ্রাহক'} আপনার পিকআপ অনুরোধটি গ্রহণ করেছেন`,
+            timestamp: new Date(req.acceptedAt),
+            read: false,
+            icon: '✅',
+            color: '#4CAF50',
+          });
+        }
+
+        if (req.onTheWayAt) {
+          generated.push({
+            id: `ontheway_${req.id}`,
+            type: 'collector_on_the_way',
+            title: 'সংগ্রাহক পথে আছেন',
+            message: `${req.collectorName || 'সংগ্রাহক'} আপনার ঠিকানায় আসছেন`,
+            timestamp: new Date(req.onTheWayAt),
+            read: false,
+            icon: '🚗',
+            color: '#FF9800',
+          });
+        }
+
+        if (req.completedAt) {
+          generated.push({
+            id: `completed_${req.id}`,
+            type: 'pickup_completed',
+            title: 'পিকআপ সম্পন্ন',
+            message: `পিকআপ সফলভাবে সম্পন্ন হয়েছে। আনুমানিক: ৳${req.estimatedEarnings || 0}`,
+            timestamp: new Date(req.completedAt),
+            read: false,
+            icon: '✓',
+            color: '#4CAF50',
+          });
+        }
+      });
+
+      // Collector: notifications from pickups they accepted/completed
+      const collectorSnap = await getDocs(query(
+        collection(db, 'pickupRequests'),
+        where('collectorId', '==', user.uid),
+        orderBy('createdAt', 'desc')
+      ));
+
+      collectorSnap.forEach((d) => {
+        const req = { id: d.id, ...d.data() };
+        if (req.acceptedAt) {
+          generated.push({
+            id: `col_accepted_${req.id}`,
+            type: 'pickup_accepted',
+            title: 'পিকআপ গ্রহণ নিশ্চিত',
+            message: 'আপনি একটি পিকআপ অনুরোধ গ্রহণ করেছেন',
+            timestamp: new Date(req.acceptedAt),
+            read: true,
+            icon: '✅',
+            color: '#4CAF50',
+          });
+        }
+        if (req.completedAt) {
+          generated.push({
+            id: `col_completed_${req.id}`,
+            type: 'pickup_completed',
+            title: 'পিকআপ সম্পন্ন',
+            message: `পিকআপ সম্পন্ন — আয়: ৳${req.actualEarnings || req.estimatedEarnings || 0}`,
+            timestamp: new Date(req.completedAt),
+            read: true,
+            icon: '💰',
+            color: '#2E7D32',
+          });
+        }
+      });
+
+      // Sort newest first
+      generated.sort((a, b) => b.timestamp - a.timestamp);
+      setNotifications(generated);
+    } catch (error) {
+      console.log('Error loading notifications:', error);
+    }
   };
 
   const formatTimestamp = (timestamp) => {

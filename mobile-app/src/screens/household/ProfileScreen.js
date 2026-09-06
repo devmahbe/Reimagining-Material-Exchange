@@ -12,10 +12,30 @@ import {
   Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { signOut, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
 import colors from '../../constants/colors';
+
+function MenuItem({ icon, label, onPress }) {
+  return (
+    <TouchableOpacity style={menuItemStyles.row} onPress={onPress}>
+      <Ionicons name={icon} size={22} color={colors.primary} style={menuItemStyles.icon} />
+      <Text style={menuItemStyles.label}>{label}</Text>
+      <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
+    </TouchableOpacity>
+  );
+}
+
+const menuItemStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border,
+  },
+  icon: { marginRight: 14, width: 24, textAlign: 'center' },
+  label: { flex: 1, fontSize: 15, color: colors.textDark, fontWeight: '500' },
+});
 
 export default function ProfileScreen({ navigation }) {
   const [userData, setUserData] = useState(null);
@@ -25,6 +45,9 @@ export default function ProfileScreen({ navigation }) {
   const [editPhone, setEditPhone] = useState('');
   const [editAddress, setEditAddress] = useState('');
   const [saving, setSaving] = useState(false);
+  const [pwModal, setPwModal] = useState(false);
+  const [newPw, setNewPw] = useState('');
+  const [pwSaving, setPwSaving] = useState(false);
 
   useEffect(() => {
     loadUserData();
@@ -87,27 +110,30 @@ export default function ProfileScreen({ navigation }) {
   };
 
   const handleChangePassword = () => {
-    Alert.prompt(
-      'পাসওয়ার্ড পরিবর্তন',
-      'নতুন পাসওয়ার্ড লিখুন (কমপক্ষে ৬ অক্ষর)',
-      async (newPass) => {
-        if (!newPass || newPass.length < 6) {
-          Alert.alert('ত্রুটি', 'কমপক্ষে ৬ অক্ষরের পাসওয়ার্ড দিন');
-          return;
-        }
-        try {
-          await updatePassword(auth.currentUser, newPass);
-          Alert.alert('সফল ✅', 'পাসওয়ার্ড পরিবর্তন হয়েছে');
-        } catch (error) {
-          if (error.code === 'auth/requires-recent-login') {
-            Alert.alert('পুনরায় লগইন', 'নিরাপত্তার জন্য আবার লগইন করুন তারপর পাসওয়ার্ড পরিবর্তন করুন');
-          } else {
-            Alert.alert('ত্রুটি', 'পাসওয়ার্ড পরিবর্তন ব্যর্থ হয়েছে');
-          }
-        }
-      },
-      'secure-text'
-    );
+    setNewPw('');
+    setPwModal(true);
+  };
+
+  const handleSavePassword = async () => {
+    if (!newPw || newPw.length < 6) {
+      Alert.alert('ত্রুটি', 'কমপক্ষে ৬ অক্ষরের পাসওয়ার্ড দিন');
+      return;
+    }
+    setPwSaving(true);
+    try {
+      await updatePassword(auth.currentUser, newPw);
+      setPwModal(false);
+      setNewPw('');
+      Alert.alert('সফল ✅', 'পাসওয়ার্ড পরিবর্তন হয়েছে');
+    } catch (error) {
+      if (error.code === 'auth/requires-recent-login') {
+        Alert.alert('পুনরায় লগইন', 'নিরাপত্তার জন্য আবার লগইন করুন, তারপর পাসওয়ার্ড পরিবর্তন করুন');
+      } else {
+        Alert.alert('ত্রুটি', 'পাসওয়ার্ড পরিবর্তন ব্যর্থ হয়েছে');
+      }
+    } finally {
+      setPwSaving(false);
+    }
   };
 
   const handleLogout = () => {
@@ -135,33 +161,75 @@ export default function ProfileScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <LinearGradient
-        colors={[colors.primary, colors.primaryLight]}
-        style={styles.header}
-      >
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>← ফিরুন</Text>
+      <LinearGradient colors={[colors.primaryDark, colors.primary]} style={styles.header}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={22} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>প্রোফাইল</Text>
-        <View style={{ width: 60 }} />
+        <View style={{ width: 40 }} />
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Profile Info */}
         <View style={styles.profileCard}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {userData?.name?.charAt(0).toUpperCase() || '👤'}
-            </Text>
+            {userData?.name ? (
+              <Text style={styles.avatarText}>{userData.name.charAt(0).toUpperCase()}</Text>
+            ) : (
+              <Ionicons name="person" size={36} color="white" />
+            )}
           </View>
           <Text style={styles.profileName}>{userData?.name || 'ব্যবহারকারী'}</Text>
           <Text style={styles.profileEmail}>{userData?.email}</Text>
           <View style={styles.roleBadge}>
-            <Text style={styles.roleText}>
-              {userData?.role === 'household' ? '🏠 পরিবার' : '👷 সংগ্রাহক'}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons
+                name={userData?.role === 'household' ? 'home-outline' : 'construct-outline'}
+                size={14}
+                color={colors.primary}
+              />
+              <Text style={styles.roleText}>
+                {userData?.role === 'household' ? 'পরিবার ব্যবহারকারী' : 'সংগ্রাহক'}
+              </Text>
+            </View>
           </View>
         </View>
+
+        {/* Change Password Modal */}
+        <Modal visible={pwModal} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>পাসওয়ার্ড পরিবর্তন</Text>
+              <Text style={styles.inputLabel}>নতুন পাসওয়ার্ড</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={newPw}
+                onChangeText={setNewPw}
+                placeholder="কমপক্ষে ৬ অক্ষর"
+                placeholderTextColor={colors.textLight}
+                secureTextEntry
+                autoFocus
+              />
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={styles.modalCancelBtn}
+                  onPress={() => setPwModal(false)}
+                >
+                  <Text style={styles.modalCancelText}>বাতিল</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalSaveBtn}
+                  onPress={handleSavePassword}
+                  disabled={pwSaving}
+                >
+                  <Text style={styles.modalSaveText}>
+                    {pwSaving ? 'সংরক্ষণ...' : 'পরিবর্তন করুন'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
 
         {/* Edit Profile Modal */}
         <Modal visible={editModal} animationType="slide" transparent>
@@ -235,62 +303,20 @@ export default function ProfileScreen({ navigation }) {
 
         {/* Menu Options */}
         <View style={styles.menuSection}>
-          <TouchableOpacity style={styles.menuItem} onPress={() => setEditModal(true)}>
-            <Text style={styles.menuIcon}>👤</Text>
-            <Text style={styles.menuText}>ব্যক্তিগত তথ্য সম্পাদনা</Text>
-            <Text style={styles.menuArrow}>→</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem} onPress={handleChangePassword}>
-            <Text style={styles.menuIcon}>🔒</Text>
-            <Text style={styles.menuText}>পাসওয়ার্ড পরিবর্তন</Text>
-            <Text style={styles.menuArrow}>→</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => navigation.navigate('History')}
-          >
-            <Text style={styles.menuIcon}>📜</Text>
-            <Text style={styles.menuText}>লেনদেনের ইতিহাস</Text>
-            <Text style={styles.menuArrow}>→</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => navigation.navigate('PriceList')}
-          >
-            <Text style={styles.menuIcon}>💰</Text>
-            <Text style={styles.menuText}>মূল্য তালিকা</Text>
-            <Text style={styles.menuArrow}>→</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => Alert.alert('ভাষা', 'বর্তমানে শুধু বাংলা ভাষা সমর্থিত। ভবিষ্যতে ইংরেজি যোগ হবে।')}
-          >
-            <Text style={styles.menuIcon}>🌐</Text>
-            <Text style={styles.menuText}>ভাষা পরিবর্তন</Text>
-            <Text style={styles.menuArrow}>→</Text>
-          </TouchableOpacity>
-
+          <MenuItem icon="person-outline" label="ব্যক্তিগত তথ্য সম্পাদনা" onPress={() => setEditModal(true)} />
+          <MenuItem icon="lock-closed-outline" label="পাসওয়ার্ড পরিবর্তন" onPress={handleChangePassword} />
+          <MenuItem icon="time-outline" label="লেনদেনের ইতিহাস" onPress={() => navigation.navigate('History')} />
+          <MenuItem icon="cash-outline" label="মূল্য তালিকা" onPress={() => navigation.navigate('PriceList')} />
+          <MenuItem icon="globe-outline" label="ভাষা পরিবর্তন" onPress={() => Alert.alert('ভাষা', 'বর্তমানে শুধু বাংলা ভাষা সমর্থিত।')} />
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => Alert.alert('সাপোর্ট', 'ইমেইল: support@bhangari.com\nফোন: 01700-000000\nসময়: সকাল ৯টা - রাত ৯টা')}
           >
-            <Text style={styles.menuIcon}>❓</Text>
+            <Ionicons name="help-circle-outline" size={22} color={colors.textGray} style={styles.menuIcon} />
             <Text style={styles.menuText}>সহায়তা ও সাপোর্ট</Text>
-            <Text style={styles.menuArrow}>→</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => Alert.alert('শর্তাবলী', 'ভাঙ্গারি এক্সচেঞ্জ ব্যবহার করে আপনি আমাদের শর্তাবলী মেনে নিচ্ছেন। বিস্তারিত জানতে ওয়েবসাইট ভিজিট করুন।')}
-          >
-            <Text style={styles.menuIcon}>📋</Text>
-            <Text style={styles.menuText}>শর্তাবলী ও নীতিমালা</Text>
-            <Text style={styles.menuArrow}>→</Text>
-          </TouchableOpacity>
+          <MenuItem icon="document-text-outline" label="শর্তাবলী ও নীতিমালা" onPress={() => Alert.alert('শর্তাবলী', 'ভাঙ্গারি এক্সচেঞ্জ ব্যবহার করে আপনি আমাদের শর্তাবলী মেনে নিচ্ছেন।')} />
         </View>
 
         {/* App Info */}
@@ -301,7 +327,8 @@ export default function ProfileScreen({ navigation }) {
 
         {/* Logout Button */}
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutText}>🚪 লগআউট</Text>
+          <Ionicons name="log-out-outline" size={20} color="#DC2626" />
+          <Text style={styles.logoutText}>লগআউট</Text>
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />
@@ -322,10 +349,10 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 20,
   },
-  backButton: {
-    fontSize: 16,
-    color: 'white',
-    fontWeight: '600',
+  backBtn: {
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center', alignItems: 'center',
   },
   headerTitle: {
     fontSize: 18,
@@ -518,17 +545,18 @@ const styles = StyleSheet.create({
     color: 'white',
   },
   logoutButton: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     backgroundColor: 'white',
     marginHorizontal: 20,
-    padding: 18,
-    borderRadius: 16,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#f44336',
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#FCA5A5',
   },
   logoutText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#f44336',
+    color: colors.error,
   },
 });
+

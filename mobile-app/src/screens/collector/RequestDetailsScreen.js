@@ -8,6 +8,9 @@ import {
   SafeAreaView,
   Alert,
   Image,
+  Platform,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
@@ -18,6 +21,8 @@ export default function RequestDetailsScreen({ navigation, route }) {
   const { requestId, autoAccept } = route.params;
   const [request, setRequest] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [completeModal, setCompleteModal] = useState(false);
+  const [actualAmount, setActualAmount] = useState('');
 
   useEffect(() => {
     loadRequestDetails();
@@ -56,17 +61,19 @@ export default function RequestDetailsScreen({ navigation, route }) {
           text: 'হ্যাঁ, গ্রহণ করুন',
           onPress: async () => {
             try {
+              const user = auth.currentUser;
+              const collectorDoc = await getDoc(doc(db, 'users', user.uid));
+              const collectorName = collectorDoc.data()?.name || 'সংগ্রাহক';
+
               await updateDoc(doc(db, 'pickupRequests', requestId), {
                 status: 'accepted',
-                collectorId: auth.currentUser.uid,
+                collectorId: user.uid,
+                collectorName,
                 acceptedAt: new Date().toISOString(),
               });
-              
-              Alert.alert(
-                'সফল! ✓',
-                'পিকআপ অনুরোধটি গ্রহণ করা হয়েছে',
-                [{ text: 'ঠিক আছে', onPress: () => navigation.goBack() }]
-              );
+
+              setRequest(prev => ({ ...prev, status: 'accepted', collectorId: user.uid, collectorName }));
+              Alert.alert('সফল! ✓', 'পিকআপ অনুরোধটি গ্রহণ করা হয়েছে');
             } catch (error) {
               Alert.alert('ত্রুটি', 'পিকআপ গ্রহণ করা যায়নি');
             }
@@ -76,33 +83,52 @@ export default function RequestDetailsScreen({ navigation, route }) {
     );
   };
 
+  const handleOnTheWay = async () => {
+    try {
+      await updateDoc(doc(db, 'pickupRequests', requestId), {
+        status: 'on-the-way',
+        onTheWayAt: new Date().toISOString(),
+      });
+      setRequest(prev => ({ ...prev, status: 'on-the-way' }));
+    } catch (error) {
+      Alert.alert('ত্রুটি', 'অবস্থা আপডেট করা যায়নি');
+    }
+  };
+
+  const handleAtLocation = async () => {
+    try {
+      await updateDoc(doc(db, 'pickupRequests', requestId), {
+        status: 'at-location',
+        atLocationAt: new Date().toISOString(),
+      });
+      setRequest(prev => ({ ...prev, status: 'at-location' }));
+    } catch (error) {
+      Alert.alert('ত্রুটি', 'অবস্থা আপডেট করা যায়নি');
+    }
+  };
+
   const handleComplete = () => {
-    Alert.alert(
-      'পিকআপ সম্পন্ন করুন',
-      'এই পিকআপটি কি সম্পন্ন হয়েছে?',
-      [
-        { text: 'না', style: 'cancel' },
-        {
-          text: 'হ্যাঁ, সম্পন্ন',
-          onPress: async () => {
-            try {
-              await updateDoc(doc(db, 'pickupRequests', requestId), {
-                status: 'completed',
-                completedAt: new Date().toISOString(),
-              });
-              
-              Alert.alert(
-                'সম্পন্ন! ✓',
-                'পিকআপটি সম্পন্ন হিসেবে চিহ্নিত করা হয়েছে',
-                [{ text: 'ঠিক আছে', onPress: () => navigation.goBack() }]
-              );
-            } catch (error) {
-              Alert.alert('ত্রুটি', 'অবস্থা আপডেট করা যায়নি');
-            }
-          }
-        }
-      ]
-    );
+    setActualAmount(String(request?.estimatedEarnings || ''));
+    setCompleteModal(true);
+  };
+
+  const handleConfirmComplete = async () => {
+    const earned = parseFloat(actualAmount) || request?.estimatedEarnings || 0;
+    try {
+      await updateDoc(doc(db, 'pickupRequests', requestId), {
+        status: 'completed',
+        completedAt: new Date().toISOString(),
+        actualEarnings: earned,
+      });
+      setCompleteModal(false);
+      Alert.alert(
+        'সম্পন্ন! ✓',
+        `পিকআপটি সম্পন্ন হিসেবে চিহ্নিত করা হয়েছে\nপ্রকৃত আয়: ৳${earned}`,
+        [{ text: 'ঠিক আছে', onPress: () => navigation.goBack() }]
+      );
+    } catch (error) {
+      Alert.alert('ত্রুটি', 'অবস্থা আপডেট করা যায়নি');
+    }
   };
 
   if (loading || !request) {
@@ -155,40 +181,41 @@ export default function RequestDetailsScreen({ navigation, route }) {
         {/* Materials Info */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>♻️ উপাদান তালিকা</Text>
-          {request.materials && request.materials.map((material, index) => (
-            <View key={index} style={styles.materialItem}>
-              <View style={styles.materialLeft}>
-                <Text style={styles.materialName}>{material.name}</Text>
-                <Text style={styles.materialQuantity}>
-                  {material.quantity} {material.unit}
+          {request.materials && request.materials.map((material, index) => {
+            const numericPrice = parseFloat(String(material.price || '0').replace(/[^0-9.]/g, '')) || 0;
+            return (
+              <View key={index} style={styles.materialItem}>
+                <View style={styles.materialLeft}>
+                  <Text style={styles.materialName}>{material.name}</Text>
+                  <Text style={styles.materialQuantity}>
+                    {material.quantity} {material.unit} — {material.price}/কেজি
+                  </Text>
+                </View>
+                <Text style={styles.materialPrice}>
+                  ৳{Math.round(numericPrice * (material.quantity || 0))}
                 </Text>
               </View>
-              <Text style={styles.materialPrice}>
-                ৳{material.price * material.quantity}
-              </Text>
-            </View>
-          ))}
+            );
+          })}
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>আনুমানিক মোট</Text>
-            <Text style={styles.totalValue}>৳{request.estimatedPrice || 0}</Text>
+            <Text style={styles.totalValue}>৳{request.estimatedEarnings || 0}</Text>
           </View>
         </View>
 
         {/* Photos */}
-        {request.materials && request.materials.some(m => m.image) && (
+        {request.images && request.images.length > 0 && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>📷 ছবি</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={styles.photosGrid}>
-                {request.materials.map((material, index) => 
-                  material.image && (
-                    <Image
-                      key={index}
-                      source={{ uri: material.image }}
-                      style={styles.photo}
-                    />
-                  )
-                )}
+                {request.images.map((imageUrl, index) => (
+                  <Image
+                    key={index}
+                    source={{ uri: imageUrl }}
+                    style={styles.photo}
+                  />
+                ))}
               </View>
             </ScrollView>
           </View>
@@ -202,26 +229,26 @@ export default function RequestDetailsScreen({ navigation, route }) {
               <Text style={styles.contactIcon}>📍</Text>
               <View style={styles.contactTextContainer}>
                 <Text style={styles.contactLabel}>ঠিকানা</Text>
-                <Text style={styles.contactValue}>{request.schedule?.address}</Text>
+                <Text style={styles.contactValue}>{request.address || 'ঠিকানা উল্লেখ নেই'}</Text>
               </View>
             </View>
-            
-            {request.schedule?.phone && (
+
+            {request.phone && (
               <View style={styles.contactRow}>
                 <Text style={styles.contactIcon}>📱</Text>
                 <View style={styles.contactTextContainer}>
                   <Text style={styles.contactLabel}>ফোন</Text>
-                  <Text style={styles.contactValue}>{request.schedule.phone}</Text>
+                  <Text style={styles.contactValue}>{request.phone}</Text>
                 </View>
               </View>
             )}
-            
-            {request.schedule?.notes && (
+
+            {request.notes && (
               <View style={styles.contactRow}>
                 <Text style={styles.contactIcon}>📝</Text>
                 <View style={styles.contactTextContainer}>
                   <Text style={styles.contactLabel}>নোট</Text>
-                  <Text style={styles.contactValue}>{request.schedule.notes}</Text>
+                  <Text style={styles.contactValue}>{request.notes}</Text>
                 </View>
               </View>
             )}
@@ -234,10 +261,7 @@ export default function RequestDetailsScreen({ navigation, route }) {
       {/* Action Buttons */}
       {request.status === 'pending' && (
         <View style={styles.actionContainer}>
-          <TouchableOpacity
-            style={styles.acceptButton}
-            onPress={handleAccept}
-          >
+          <TouchableOpacity style={styles.acceptButton} onPress={handleAccept}>
             <Text style={styles.acceptButtonText}>✓ পিকআপ গ্রহণ করুন</Text>
           </TouchableOpacity>
         </View>
@@ -245,14 +269,63 @@ export default function RequestDetailsScreen({ navigation, route }) {
 
       {request.status === 'accepted' && request.collectorId === auth.currentUser?.uid && (
         <View style={styles.actionContainer}>
-          <TouchableOpacity
-            style={styles.completeButton}
-            onPress={handleComplete}
-          >
+          <TouchableOpacity style={styles.onTheWayButton} onPress={handleOnTheWay}>
+            <Text style={styles.onTheWayButtonText}>🚗 পথে আছি</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {request.status === 'on-the-way' && request.collectorId === auth.currentUser?.uid && (
+        <View style={styles.actionContainer}>
+          <TouchableOpacity style={styles.atLocationButton} onPress={handleAtLocation}>
+            <Text style={styles.atLocationButtonText}>📍 পৌঁছেছি</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {(request.status === 'at-location' || request.status === 'in-progress') &&
+        request.collectorId === auth.currentUser?.uid && (
+        <View style={styles.actionContainer}>
+          <TouchableOpacity style={styles.completeButton} onPress={handleComplete}>
             <Text style={styles.completeButtonText}>✓ সম্পন্ন হিসেবে চিহ্নিত করুন</Text>
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Complete + Actual Earnings Modal */}
+      <Modal visible={completeModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>পিকআপ সম্পন্ন করুন</Text>
+            <Text style={styles.modalSubtitle}>
+              প্রকৃত পরিমাণ লিখুন (আনুমানিক: ৳{request?.estimatedEarnings || 0})
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              value={actualAmount}
+              onChangeText={setActualAmount}
+              placeholder="প্রকৃত আয় (টাকা)"
+              placeholderTextColor="#aaa"
+              keyboardType="numeric"
+              autoFocus
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setCompleteModal(false)}
+              >
+                <Text style={styles.modalCancelText}>বাতিল</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalConfirmBtn}
+                onPress={handleConfirmComplete}
+              >
+                <Text style={styles.modalConfirmText}>সম্পন্ন করুন ✓</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -261,6 +334,9 @@ function getStatusLabel(status) {
   const labels = {
     pending: '⏳ অপেক্ষমাণ',
     accepted: '✓ গৃহীত',
+    'on-the-way': '🚗 পথে আছেন',
+    'at-location': '📍 পৌঁছেছেন',
+    'in-progress': '📦 সংগ্রহ করছেন',
     completed: '✓ সম্পন্ন',
     cancelled: '✗ বাতিল',
   };
@@ -268,13 +344,16 @@ function getStatusLabel(status) {
 }
 
 function getStatusColor(status) {
-  const colors = {
+  const colorMap = {
     pending: '#FF8F00',
     accepted: '#2196F3',
+    'on-the-way': '#FF9800',
+    'at-location': '#9C27B0',
+    'in-progress': '#2196F3',
     completed: '#4CAF50',
     cancelled: '#f44336',
   };
-  return colors[status] || '#9E9E9E';
+  return colorMap[status] || '#9E9E9E';
 }
 
 function formatDate(dateString) {
@@ -471,6 +550,28 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: 'white',
   },
+  onTheWayButton: {
+    backgroundColor: '#FF9800',
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  onTheWayButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: 'white',
+  },
+  atLocationButton: {
+    backgroundColor: '#9C27B0',
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  atLocationButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: 'white',
+  },
   completeButton: {
     backgroundColor: '#4CAF50',
     paddingVertical: 16,
@@ -490,5 +591,70 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 16,
     color: colors.textGray,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.textDark,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: colors.textGray,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  modalInput: {
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.textDark,
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.textGray,
+  },
+  modalConfirmBtn: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: '#4CAF50',
+    alignItems: 'center',
+  },
+  modalConfirmText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: 'white',
   },
 });

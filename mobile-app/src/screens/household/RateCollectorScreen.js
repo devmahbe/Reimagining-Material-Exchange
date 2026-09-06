@@ -8,10 +8,11 @@ import {
   SafeAreaView,
   TextInput,
   Alert,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { doc, updateDoc, getDoc, setDoc, increment } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { db, auth } from '../../config/firebase';
 import colors from '../../constants/colors';
 
 export default function RateCollectorScreen({ navigation, route }) {
@@ -76,7 +77,7 @@ export default function RateCollectorScreen({ navigation, route }) {
       await setDoc(doc(db, 'reviews', `${requestId}_${collectorId}`), {
         requestId,
         collectorId,
-        userId: collectorDoc.data()?.userId,
+        userId: auth.currentUser.uid,
         rating,
         review,
         tags: selectedTags,
