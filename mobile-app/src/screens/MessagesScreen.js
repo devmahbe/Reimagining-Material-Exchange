@@ -18,6 +18,8 @@ import colors from '../constants/colors';
 export default function MessagesScreen({ navigation }) {
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
