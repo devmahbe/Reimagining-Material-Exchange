@@ -1,0 +1,43 @@
+rules_version = '2';
+
+// Firestore security rules for Bhangari Exchange.
+// Users may only read/write their OWN documents; pickup requests are readable
+// by any authenticated user (so collectors can discover pending requests) and
+// updateable by participants (household owns it, or collector who accepted it).
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Pickup requests
+    match /pickupRequests/{requestId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null
+        && (request.resource.data.userId == request.auth.uid
+            || resource.data.userId == request.auth.uid
+            || resource.data.collectorId == request.auth.uid);
+    }
+
+    // Messages
+    match /messages/{messageId} {
+      allow read: if request.auth != null
+        && (resource.data.senderId == request.auth.uid
+            || resource.data.recipientId == request.auth.uid);
+      allow create: if request.auth != null
+        && request.data.senderId == request.auth.uid;
+    }
+
+    // Reviews
+    match /reviews/{reviewId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.data.userId == request.auth.uid;
+    }
+  }
+}

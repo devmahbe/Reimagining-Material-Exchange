@@ -10,12 +10,21 @@ import { storage } from '../config/firebase';
  */
 export const uploadImage = async (uri, folder = 'images', fileName = null) => {
   try {
-    // Generate unique filename if not provided
     const timestamp = Date.now();
     const name = fileName || `image_${timestamp}.jpg`;
-    const storagePath = `${folder}/${name}`;
 
-    // Fetch the image data
+
+
+    let storagePath = `${folder}/${name}`;
+    try {
+      const { auth } = await import('../config/firebase');
+      const uid = auth.currentUser?.uid;
+      if (uid) storagePath = `${folder}/${uid}/${name}`;
+    } catch (_) {
+     
+    }
+
+
     const response = await fetch(uri);
     const blob = await response.blob();
 
@@ -23,7 +32,6 @@ export const uploadImage = async (uri, folder = 'images', fileName = null) => {
     const storageRef = ref(storage, storagePath);
     await uploadBytes(storageRef, blob);
 
-    // Get download URL
     const downloadURL = await getDownloadURL(storageRef);
     return downloadURL;
   } catch (error) {

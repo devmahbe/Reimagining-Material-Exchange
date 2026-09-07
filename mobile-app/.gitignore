@@ -17,13 +17,14 @@ web-build/
 # Temporary files
 *.log
 *.tmp
-package-lock.json/
-package.json/
 
-# Environment variables 
+# Environment variables
 .env
 .env.local
 .env.development
 .env.production
 
-/Documentation
+# Firebase local state (never commit); keep backend config (firebase.json,
+# firestore.rules, firestore.indexes.json, storage.rules) committed.
+.firebase/hosting.cache
+.firebase/
