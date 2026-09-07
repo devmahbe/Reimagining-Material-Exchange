@@ -7,7 +7,11 @@ import { auth } from '../config/firebase';
 
 
 WebBrowser.maybeCompleteAuthSession();
-const GOOGLE_WEB_CLIENT_ID = '1083221786919-aka14r2qpg96dinbbbdct2imkc9ke7ic.apps.googleusercontent.com';
+const GOOGLE_WEB_CLIENT_ID =
+  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+  '1083221786919-aka14r2qpg96dinbbbdct2imkc9ke7ic.apps.googleusercontent.com';
+const GOOGLE_ANDROID_CLIENT_ID =
+  process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
 
 
 export const useGoogleAuth = () => {
@@ -15,13 +19,15 @@ export const useGoogleAuth = () => {
   if (Platform.OS === 'web') {
     return { request: null, response: null, promptAsync: null };
   }
-  
-  // On mobile, use expo-auth-session
+
+  // On mobile, use expo-auth-session.
+  // Android REQUIRES androidClientId (the error "Client Id property
+  // androidClientId must be defined" comes from here when it's missing).
+  // Provide it in .env: EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID
+  // (get it from Google Cloud Console → Credentials → OAuth 2.0 Client IDs → Android).
   const [request, response, promptAsync] = Google.useAuthRequest({
     webClientId: GOOGLE_WEB_CLIENT_ID,
-    // Optional: Add these if you create Android/iOS apps in Google Cloud Console
-    // iosClientId: 'YOUR_IOS_CLIENT_ID',
-    // androidClientId: 'YOUR_ANDROID_CLIENT_ID',
+    androidClientId: GOOGLE_ANDROID_CLIENT_ID || undefined,
   });
 
   return { request, response, promptAsync };
