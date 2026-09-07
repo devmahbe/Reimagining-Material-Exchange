@@ -25,10 +25,16 @@ export const useGoogleAuth = () => {
   // androidClientId must be defined" comes from here when it's missing).
   // Provide it in .env: EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID
   // (get it from Google Cloud Console → Credentials → OAuth 2.0 Client IDs → Android).
-  const [request, response, promptAsync] = Google.useAuthRequest({
+  const authRequestArray = Google.useAuthRequest({
     webClientId: GOOGLE_WEB_CLIENT_ID,
     androidClientId: GOOGLE_ANDROID_CLIENT_ID || undefined,
   });
+  const [request, response, promptAsync] = authRequestArray;
+
+
+  if (request?.redirectUri) {
+    console.log('REDIRECT DEBUG (register this URI):', request.redirectUri);
+  }
 
   return { request, response, promptAsync };
 };
@@ -39,6 +45,8 @@ export const useGoogleAuth = () => {
  * @returns {Promise<UserCredential>} Firebase user credential
  */
 export const handleGoogleAuthResponse = async (response) => {
+  // TEMP DEBUG — remove after diagnosing Google sign-in
+  console.log('GOOGLE RESPONSE DEBUG:', JSON.stringify(response, null, 2));
   if (response?.type === 'success') {
     const { authentication } = response;
     
