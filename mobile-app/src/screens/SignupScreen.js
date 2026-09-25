@@ -14,7 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
-import { useGoogleAuth, handleGoogleAuthResponse } from '../utils/googleAuth';
+import { signInWithGoogleNative } from '../utils/googleAuth';
 import colors from '../constants/colors';
 import banglaText from '../constants/banglaText';
 
@@ -27,58 +27,6 @@ export default function SignupScreen({ navigation }) {
   const [selectedRole, setSelectedRole] = useState('household');
   const [loading, setLoading] = useState(false);
   
-  // Google Auth (works on all platforms, but we only use it on mobile)
-  const googleAuth = useGoogleAuth();
-  const { request, response, promptAsync } = googleAuth || { request: null, response: null, promptAsync: null };
-  
-  // Handle Google auth response for mobile
-  useEffect(() => {
-    if (Platform.OS !== 'web' && response) {
-      handleGoogleSignUpMobile();
-    }
-  }, [response]);
-  
-  const handleGoogleSignUpMobile = async () => {
-    try {
-      setLoading(true);
-      const userCredential = await handleGoogleAuthResponse(response);
-      const user = userCredential.user;
-      
-      // Check if user already exists
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      
-      if (userDoc.exists()) {
-        Alert.alert('বিদ্যমান', 'এই অ্যাকাউন্ট ইতিমধ্যে আছে। লগইন করুন।');
-        navigation.replace('Login');
-      } else {
-        // Create new user with selected role
-        await setDoc(doc(db, 'users', user.uid), {
-          name: user.displayName,
-          email: user.email,
-          phone: '',
-          address: '',
-          role: selectedRole,
-          createdAt: new Date().toISOString(),
-          authProvider: 'google',
-        });
-        
-        Alert.alert('সফল', 'Google দিয়ে নিবন্ধন সফল হয়েছে!');
-        
-        // Navigate based on role
-        if (selectedRole === 'collector') {
-          navigation.replace('CollectorHome');
-        } else {
-          navigation.replace('HouseholdHome');
-        }
-      }
-    } catch (error) {
-      console.log('Google Sign-Up Error:', error);
-      Alert.alert('ত্রুটি', 'Google নিবন্ধন ব্যর্থ');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSignup = async () => {
     if (!name || !email || !phone || !password) {
       Alert.alert('ত্রুটি', 'অনুগ্রহ করে সব ক্ষেত্র পূরণ করুন');
@@ -160,9 +108,31 @@ export default function SignupScreen({ navigation }) {
           }
         }
       } else {
-        // Mobile: Use expo-auth-session
-        await promptAsync();
-        // Response will be handled by useEffect
+        const userCredential = await signInWithGoogleNative();
+        if (!userCredential) {
+          // User cancelled the Google account picker
+          setLoading(false);
+          return;
+        }
+        const user = userCredential.user;
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (!userDoc.exists()) {
+          await setDoc(doc(db, 'users', user.uid), {
+            name: user.displayName,
+            email: user.email,
+            phone: phone || '',
+            address: address || '',
+            role: selectedRole,
+            createdAt: new Date().toISOString(),
+            authProvider: 'google',
+          });
+        }
+        const userData = userDoc.exists() ? userDoc.data() : { role: selectedRole };
+        if (userData?.role === 'collector') {
+          navigation.replace('CollectorHome');
+        } else {
+          navigation.replace('HouseholdHome');
+        }
       }
     } catch (error) {
       console.log('Google Sign-Up Error:', error);
@@ -295,7 +265,7 @@ export default function SignupScreen({ navigation }) {
               <TouchableOpacity
                 style={styles.googleButton}
                 onPress={handleGoogleSignup}
-                disabled={loading || (Platform.OS !== 'web' && !request)}
+                disabled={loading}
               >
                 <Text style={styles.googleIcon}>🔍</Text>
                 <Text style={styles.googleButtonText}>Google দিয়ে নিবন্ধন করুন</Text>

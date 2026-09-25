@@ -20,7 +20,7 @@ import {
 } from 'firebase/auth';
 import { auth, db } from '../config/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { useGoogleAuth, handleGoogleAuthResponse } from '../utils/googleAuth';
+import { signInWithGoogleNative } from '../utils/googleAuth';
 import colors from '../constants/colors';
 import banglaText from '../constants/banglaText';
 
@@ -29,49 +29,6 @@ export default function LoginScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-
-  const googleAuth = useGoogleAuth();
-  const { request, response, promptAsync } = googleAuth || {
-    request: null,
-    response: null,
-    promptAsync: null,
-  };
-
-  useEffect(() => {
-    if (Platform.OS !== 'web' && response) {
-      handleGoogleSignInMobile();
-    }
-  }, [response]);
-
-  const handleGoogleSignInMobile = async () => {
-    try {
-      setLoading(true);
-      const userCredential = await handleGoogleAuthResponse(response);
-      const user = userCredential.user;
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists()) {
-        await setDoc(doc(db, 'users', user.uid), {
-          name: user.displayName,
-          email: user.email,
-          phone: '',
-          address: '',
-          role: 'household',
-          createdAt: new Date().toISOString(),
-          authProvider: 'google',
-        });
-      }
-      const userData = userDoc.exists() ? userDoc.data() : { role: 'household' };
-      if (userData?.role === 'collector') {
-        navigation.replace('CollectorHome');
-      } else {
-        navigation.replace('HouseholdHome');
-      }
-    } catch (error) {
-      Alert.alert('ত্রুটি', 'Google প্রবেশ ব্যর্থ');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -138,7 +95,31 @@ export default function LoginScreen({ navigation }) {
           navigation.replace('HouseholdHome');
         }
       } else {
-        await promptAsync();
+        const userCredential = await signInWithGoogleNative();
+        if (!userCredential) {
+          // User cancelled the Google account picker
+          setLoading(false);
+          return;
+        }
+        const user = userCredential.user;
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (!userDoc.exists()) {
+          await setDoc(doc(db, 'users', user.uid), {
+            name: user.displayName,
+            email: user.email,
+            phone: '',
+            address: '',
+            role: 'household',
+            createdAt: new Date().toISOString(),
+            authProvider: 'google',
+          });
+        }
+        const userData = userDoc.exists() ? userDoc.data() : { role: 'household' };
+        if (userData?.role === 'collector') {
+          navigation.replace('CollectorHome');
+        } else {
+          navigation.replace('HouseholdHome');
+        }
       }
     } catch (error) {
       Alert.alert('ত্রুটি', 'Google প্রবেশ ব্যর্থ');
@@ -233,7 +214,7 @@ export default function LoginScreen({ navigation }) {
             <TouchableOpacity
               style={styles.googleBtn}
               onPress={handleGoogleSignIn}
-              disabled={loading || (Platform.OS !== 'web' && !request)}
+              disabled={loading}
             >
               <View style={styles.googleIconBox}>
                 <Text style={styles.googleG}>G</Text>

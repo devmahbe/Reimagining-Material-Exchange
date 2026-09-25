@@ -1,75 +1,81 @@
 import { Platform } from 'react-native';
-import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
-import { makeRedirectUri } from 'expo-auth-session';
+import {
+  GoogleSignin,
+  isSuccessResponse,
+} from '@react-native-google-signin/google-signin';
 import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
 import { auth } from '../config/firebase';
 
-
-WebBrowser.maybeCompleteAuthSession();
+// Google OAuth client IDs from Google Cloud Console -> Credentials.
+// The WEB client ID matters for native sign-in: it sets the audience (aud)
+// of the ID token that Firebase verifies on the server.
 const GOOGLE_WEB_CLIENT_ID =
   process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
   '1083221786919-aka14r2qpg96dinbbbdct2imkc9ke7ic.apps.googleusercontent.com';
-const GOOGLE_ANDROID_CLIENT_ID =
-  process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
+const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
 
+let isConfigured = false;
 
-export const useGoogleAuth = () => {
-  // On web, return null values since we use signInWithPopup instead
-  if (Platform.OS === 'web') {
-    return { request: null, response: null, promptAsync: null };
-  }
-
-  // On mobile, use expo-auth-session.
-  // Android REQUIRES androidClientId (the error "Client Id property
-  // androidClientId must be defined" comes from here when it's missing).
-  // Provide it in .env: EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID
-  // (get it from Google Cloud Console → Credentials → OAuth 2.0 Client IDs → Android).
-  const authRequestArray = Google.useAuthRequest({
+/**
+ * Configure the native Google Sign-In module. Safe to call repeatedly.
+ * On Android the flow uses the OAuth client whose package name + SHA-1 match
+ * this build, so there is no custom URI scheme or browser redirect involved.
+ */
+export const configureGoogleSignIn = () => {
+  if (isConfigured) return;
+  GoogleSignin.configure({
     webClientId: GOOGLE_WEB_CLIENT_ID,
-    androidClientId: GOOGLE_ANDROID_CLIENT_ID || undefined,
+    iosClientId: GOOGLE_IOS_CLIENT_ID || undefined,
+    offlineAccess: false,
   });
-  const [request, response, promptAsync] = authRequestArray;
-
-
-  if (request?.redirectUri) {
-    console.log('REDIRECT DEBUG (register this URI):', request.redirectUri);
-  }
-
-  return { request, response, promptAsync };
+  isConfigured = true;
 };
 
 /**
- * Handle Google Sign-In response and authenticate with Firebase
- * @param {Object} response - Response from Google auth
- * @returns {Promise<UserCredential>} Firebase user credential
+ * Native Google Sign-In for iOS/Android development builds.
+ * Opens the on-device Google account picker (no browser round-trip) and signs
+ * the user in to Firebase with the returned ID token.
+ *
+ * @returns {Promise<UserCredential|null>} null when the user cancels
  */
-export const handleGoogleAuthResponse = async (response) => {
-  // TEMP DEBUG — remove after diagnosing Google sign-in
-  console.log('GOOGLE RESPONSE DEBUG:', JSON.stringify(response, null, 2));
-  if (response?.type === 'success') {
-    const { authentication } = response;
-    
-    // Create Google credential for Firebase
-    const credential = GoogleAuthProvider.credential(
-      authentication.idToken,
-      authentication.accessToken
+export const signInWithGoogleNative = async () => {
+  if (Platform.OS === 'web') {
+    throw new Error(
+      'signInWithGoogleNative is for iOS/Android only. Use signInWithPopup on web.'
     );
-    
-    // Sign in to Firebase with Google credential
-    const userCredential = await signInWithCredential(auth, credential);
-    return userCredential;
   }
-  
-  throw new Error('Google authentication failed or was cancelled');
+
+  configureGoogleSignIn();
+
+  if (Platform.OS === 'android') {
+    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+  }
+
+  const response = await GoogleSignin.signIn();
+
+  if (!isSuccessResponse(response)) {
+    // User dismissed the Google account picker
+    return null;
+  }
+
+  const { idToken } = response.data;
+  if (!idToken) {
+    throw new Error('Google Sign-In did not return an idToken');
+  }
+
+  const credential = GoogleAuthProvider.credential(idToken);
+  return await signInWithCredential(auth, credential);
 };
 
 /**
- * Simplified Google Sign-In function
- * @param {Function} promptAsync - Prompt function from useGoogleAuth hook
- * @returns {Promise<UserCredential>} Firebase user credential
+ * Sign out of the native Google module (Firebase sign-out is separate).
  */
-export const signInWithGoogle = async (promptAsync) => {
-  const response = await promptAsync();
-  return await handleGoogleAuthResponse(response);
+export const signOutGoogle = async () => {
+  try {
+    if (Platform.OS !== 'web') {
+      await GoogleSignin.signOut();
+    }
+  } catch (error) {
+    // Never let the Google module block the app's sign-out flow
+  }
 };
