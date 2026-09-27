@@ -1,1 +1,4 @@
 /Documentation
+
+# Expo CLI local state (created when running expo from the repo root)
+.expo/

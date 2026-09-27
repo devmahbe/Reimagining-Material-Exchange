@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { signOut, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
+import { signOutGoogle } from '../../utils/googleAuth';
 import colors from '../../constants/colors';
 
 function MenuItem({ icon, label, onPress }) {
@@ -147,6 +148,9 @@ export default function ProfileScreen({ navigation }) {
           style: 'destructive',
           onPress: async () => {
             try {
+              // Clear the Google session too, otherwise tapping Google sign-in
+              // again would silently reuse the previous account.
+              await signOutGoogle();
               await signOut(auth);
               navigation.replace('Login');
             } catch (error) {
