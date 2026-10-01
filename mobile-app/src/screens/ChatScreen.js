@@ -1,466 +1,232 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Text,
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Linking,
   StyleSheet,
-  ScrollView,
+  Text,
   TextInput,
   TouchableOpacity,
-  SafeAreaView,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
+  View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  onSnapshot,
-  addDoc,
-  doc,
-  updateDoc,
-  getDocs,
-  serverTimestamp,
-} from 'firebase/firestore';
-import { db, auth } from '../config/firebase';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { auth } from '../config/firebase';
+import { Alert } from '../utils/alert';
+import { getConversationId, sendMessage, subscribeToConversation } from '../services/chatService';
+import { getUserProfile } from '../services/userService';
+import { AppHeader, Avatar, EmptyState, LoadingView } from '../components/ui';
+import { formatDateBangla, formatTimeBangla, isSameDay, toDate } from '../utils/helpers';
 import colors from '../constants/colors';
+import { font, radius, spacing } from '../constants/theme';
+
+const QUICK_REPLIES = ['আসসালামু আলাইকুম', 'আমি রওনা দিয়েছি', 'কখন আসবেন?', 'ধন্যবাদ!'];
 
 export default function ChatScreen({ navigation, route }) {
   const { recipientId, recipientName, requestId } = route.params;
+  const insets = useSafeAreaInsets();
+  const uid = auth.currentUser?.uid;
+  const conversationId = uid ? getConversationId(uid, recipientId) : null;
+  const listRef = useRef(null);
+
   const [messages, setMessages] = useState([]);
-  const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const scrollViewRef = useRef();
-  const currentUser = auth.currentUser;
-  const conversationId = [currentUser.uid, recipientId].sort().join('_');
+  const [error, setError] = useState(false);
+  const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [recipient, setRecipient] = useState(null);
 
   useEffect(() => {
-    markMessagesAsRead();
-    const unsubscribe = loadMessages();
-    return () => { if (unsubscribe) unsubscribe(); };
-  }, []);
-
-  const markMessagesAsRead = async () => {
-    try {
-      const unreadQ = query(
-        collection(db, 'messages'),
-        where('conversationId', '==', conversationId),
-        where('recipientId', '==', currentUser.uid),
-        where('read', '==', false)
-      );
-      const snap = await getDocs(unreadQ);
-      await Promise.all(snap.docs.map(d => updateDoc(d.ref, { read: true })));
-    } catch (_) {}
-  };
-
-  const loadMessages = () => {
-    const q = query(
-      collection(db, 'messages'),
-      where('conversationId', '==', conversationId),
-      orderBy('createdAt', 'asc')
+    if (!conversationId) return undefined;
+    const unsubscribe = subscribeToConversation(
+      conversationId,
+      uid,
+      (msgs) => {
+        setMessages(msgs);
+        setLoading(false);
+      },
+      () => {
+        setError(true);
+        setLoading(false);
+      }
     );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const msgs = [];
-      snapshot.forEach((d) => {
-        msgs.push({ id: d.id, ...d.data() });
-      });
-      setMessages(msgs);
-      setLoading(false);
-
-      // Mark any newly arrived incoming messages as read
-      const unreadDocs = snapshot.docs.filter(d => {
-        const data = d.data();
-        return data.recipientId === currentUser.uid && data.read === false;
-      });
-      unreadDocs.forEach(d => updateDoc(d.ref, { read: true }).catch(() => {}));
-
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-    });
-
     return unsubscribe;
-  };
+  }, [conversationId, uid]);
 
-  const sendMessage = async () => {
-    if (!newMessage.trim()) return;
-    
+  useEffect(() => {
+    getUserProfile(recipientId).then(setRecipient).catch(() => {});
+  }, [recipientId]);
+
+  const handleSend = async (value = text) => {
+    const body = value.trim();
+    if (!body || sending) return;
+    setSending(true);
     try {
-      await addDoc(collection(db, 'messages'), {
-        conversationId,
-        senderId: currentUser.uid,
-        recipientId,
-        text: newMessage.trim(),
-        requestId: requestId || null,
-        createdAt: new Date().toISOString(),
-        read: false,
-      });
-
-      setNewMessage('');
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    } catch (error) {
-      console.log('Error sending message:', error);
+      await sendMessage({ senderId: uid, recipientId, text: body, requestId });
+      if (value === text) setText('');
+    } catch (e) {
+      Alert.alert('বার্তা পাঠানো যায়নি', 'ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন');
+    } finally {
+      setSending(false);
     }
   };
 
-  const formatTime = (timestamp) => {
-    if (!timestamp) return '';
-    
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffInHours = (now - date) / (1000 * 60 * 60);
+  const scrollToEnd = () => listRef.current?.scrollToEnd({ animated: true });
 
-    if (diffInHours < 24) {
-      return date.toLocaleTimeString('bn-BD', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } else {
-      return date.toLocaleDateString('bn-BD', {
-        day: 'numeric',
-        month: 'short',
-      });
-    }
-  };
-
-  return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <LinearGradient
-        colors={[colors.primary, colors.primaryLight]}
-        style={styles.header}
-      >
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>← ফিরুন</Text>
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {recipientName?.charAt(0) || '?'}
-            </Text>
+  const renderItem = ({ item, index }) => {
+    const mine = item.senderId === uid;
+    const date = toDate(item.createdAt);
+    const prev = index > 0 ? toDate(messages[index - 1].createdAt) : null;
+    const showDate = date && (!prev || !isSameDay(prev, date));
+    return (
+      <View>
+        {showDate ? (
+          <View style={styles.dateSep}>
+            <Text style={styles.dateText}>{isSameDay(date, new Date()) ? 'আজ' : formatDateBangla(date, { short: true })}</Text>
           </View>
-          <View>
-            <Text style={styles.headerTitle}>{recipientName}</Text>
-            <Text style={styles.headerStatus}>ভাঙ্গারি এক্সচেঞ্জ ব্যবহারকারী</Text>
+        ) : null}
+        <View style={[styles.bubbleRow, mine ? styles.rowMine : styles.rowTheirs]}>
+          <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
+            <Text style={[styles.msgText, mine && { color: colors.white }]}>{item.text}</Text>
+            <View style={styles.metaRow}>
+              <Text style={[styles.msgTime, mine && { color: 'rgba(255,255,255,0.75)' }]}>{formatTimeBangla(date)}</Text>
+              {mine ? (
+                <Ionicons name={item.read ? 'checkmark-done' : 'checkmark'} size={14} color={item.read ? '#A7F3D0' : 'rgba(255,255,255,0.75)'} />
+              ) : null}
+            </View>
           </View>
         </View>
-        <TouchableOpacity onPress={() => {}}>
-          <Text style={styles.headerIcon}>ℹ️</Text>
-        </TouchableOpacity>
-      </LinearGradient>
+      </View>
+    );
+  };
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.chatContainer}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-      >
-        {/* Messages */}
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.messagesList}
-          contentContainerStyle={styles.messagesContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {loading ? (
-            <Text style={styles.loadingText}>লোড হচ্ছে...</Text>
-          ) : messages.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyIcon}>💬</Text>
-              <Text style={styles.emptyText}>কথোপকথন শুরু করুন</Text>
-              <Text style={styles.emptySubtext}>
-                {recipientName} কে আপনার প্রথম মেসেজ পাঠান
-              </Text>
-            </View>
-          ) : (
-            messages.map((msg, index) => {
-              const isMyMessage = msg.senderId === currentUser.uid;
-              const showDate = index === 0 || 
-                new Date(messages[index - 1].createdAt).toDateString() !== 
-                new Date(msg.createdAt).toDateString();
+  const phone = recipient?.phone;
 
-              return (
-                <View key={msg.id}>
-                  {showDate && (
-                    <View style={styles.dateSeparator}>
-                      <Text style={styles.dateText}>
-                        {new Date(msg.createdAt).toLocaleDateString('bn-BD', {
-                          day: 'numeric',
-                          month: 'long',
-                        })}
-                      </Text>
-                    </View>
-                  )}
-                  <View
-                    style={[
-                      styles.messageContainer,
-                      isMyMessage ? styles.myMessageContainer : styles.theirMessageContainer,
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.messageBubble,
-                        isMyMessage ? styles.myMessage : styles.theirMessage,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.messageText,
-                          isMyMessage ? styles.myMessageText : styles.theirMessageText,
-                        ]}
-                      >
-                        {msg.text}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.messageTime,
-                          isMyMessage ? styles.myMessageTime : styles.theirMessageTime,
-                        ]}
-                      >
-                        {formatTime(msg.createdAt)}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              );
-            })
-          )}
-        </ScrollView>
+  return (
+    <View style={styles.container}>
+      <AppHeader
+        title={recipient?.name || recipientName || 'কথোপকথন'}
+        subtitle={recipient?.role === 'collector' ? 'সংগ্রাহক' : recipient?.role === 'household' ? 'পরিবার' : 'ভাঙ্গারি এক্সচেঞ্জ ব্যবহারকারী'}
+        onBack={() => navigation.goBack()}
+        right={<Avatar name={recipient?.name || recipientName} size={40} bg="rgba(255,255,255,0.2)" color={colors.white} />}
+      />
 
-        {/* Input Area */}
-        <View style={styles.inputContainer}>
-          <TouchableOpacity
-            style={styles.attachButton}
-            onPress={() => Alert.alert('সংযুক্তি', 'ছবি পাঠাতে প্রথমে পিকআপ অনুরোধ তৈরি করুন, সেখান থেকে ছবি যুক্ত করা যাবে।')}
-          >
-            <Text style={styles.attachIcon}>📎</Text>
-          </TouchableOpacity>
-          
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+        {loading ? (
+          <LoadingView />
+        ) : error ? (
+          <EmptyState icon="cloud-offline-outline" title="বার্তা লোড করা যায়নি" message="ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন" />
+        ) : (
+          <FlatList
+            ref={listRef}
+            data={messages}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            contentContainerStyle={styles.list}
+            onContentSizeChange={scrollToEnd}
+            keyboardShouldPersistTaps="handled"
+            ListEmptyComponent={
+              <EmptyState
+                icon="chatbubble-ellipses-outline"
+                title="কথোপকথন শুরু করুন"
+                message={`${recipient?.name || recipientName || ''} কে প্রথম বার্তা পাঠান`}
+              />
+            }
+          />
+        )}
+
+        {messages.length === 0 && !loading && !error ? (
+          <View style={styles.quickRow}>
+            {QUICK_REPLIES.map((q) => (
+              <TouchableOpacity key={q} style={styles.quick} onPress={() => handleSend(q)}>
+                <Text style={styles.quickText}>{q}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : null}
+
+        <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
+          {phone ? (
+            <TouchableOpacity
+              style={styles.sideBtn}
+              onPress={() => Linking.openURL(`tel:${phone}`).catch(() => {})}
+              accessibilityLabel="কল করুন"
+            >
+              <Ionicons name="call-outline" size={22} color={colors.primary} />
+            </TouchableOpacity>
+          ) : null}
           <TextInput
             style={styles.input}
-            placeholder="মেসেজ লিখুন..."
+            placeholder="বার্তা লিখুন..."
             placeholderTextColor={colors.textLight}
-            value={newMessage}
-            onChangeText={setNewMessage}
+            value={text}
+            onChangeText={setText}
             multiline
-            maxLength={500}
+            maxLength={1000}
           />
-
           <TouchableOpacity
-            style={[styles.sendButton, !newMessage.trim() && styles.sendButtonDisabled]}
-            onPress={sendMessage}
-            disabled={!newMessage.trim()}
+            style={[styles.sendBtn, (!text.trim() || sending) && styles.sendDisabled]}
+            onPress={() => handleSend()}
+            disabled={!text.trim() || sending}
+            accessibilityLabel="পাঠান"
           >
-            <LinearGradient
-              colors={newMessage.trim() ? [colors.primary, colors.primaryLight] : ['#ccc', '#ccc']}
-              style={styles.sendButtonGradient}
-            >
-              <Text style={styles.sendIcon}>✈️</Text>
-            </LinearGradient>
+            {sending ? <ActivityIndicator color={colors.white} size="small" /> : <Ionicons name="send" size={20} color={colors.white} />}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    paddingTop: 10,
-  },
-  backButton: {
-    fontSize: 16,
-    color: 'white',
-    fontWeight: '600',
-  },
-  headerCenter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginLeft: 12,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  avatarText: {
-    fontSize: 18,
-    color: 'white',
-    fontWeight: '700',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: 'white',
-  },
-  headerStatus: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-  headerIcon: {
-    fontSize: 20,
-  },
-  chatContainer: {
-    flex: 1,
-  },
-  messagesList: {
-    flex: 1,
-  },
-  messagesContent: {
-    padding: 16,
-  },
-  loadingText: {
-    textAlign: 'center',
-    color: colors.textGray,
-    padding: 20,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: colors.textGray,
-    textAlign: 'center',
-  },
-  dateSeparator: {
-    alignItems: 'center',
-    marginVertical: 16,
-  },
+  container: { flex: 1, backgroundColor: colors.background },
+  list: { padding: spacing.lg, flexGrow: 1 },
+  dateSep: { alignItems: 'center', marginVertical: spacing.md },
   dateText: {
-    fontSize: 12,
+    fontSize: font.xs + 1,
     color: colors.textGray,
-    backgroundColor: '#F5F5F5',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  messageContainer: {
-    marginBottom: 12,
-    maxWidth: '75%',
-  },
-  myMessageContainer: {
-    alignSelf: 'flex-end',
-  },
-  theirMessageContainer: {
-    alignSelf: 'flex-start',
-  },
-  messageBubble: {
-    padding: 12,
-    borderRadius: 16,
-  },
-  myMessage: {
-    backgroundColor: colors.primary,
-    borderBottomRightRadius: 4,
-  },
-  theirMessage: {
-    backgroundColor: 'white',
-    borderBottomLeftRadius: 4,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
-  },
-  messageText: {
-    fontSize: 16,
-    lineHeight: 22,
-    marginBottom: 4,
-  },
-  myMessageText: {
-    color: 'white',
-  },
-  theirMessageText: {
-    color: colors.text,
-  },
-  messageTime: {
-    fontSize: 11,
-  },
-  myMessageTime: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    textAlign: 'right',
-  },
-  theirMessageTime: {
-    color: colors.textLight,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    padding: 12,
-    backgroundColor: 'white',
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-  },
-  attachButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  attachIcon: {
-    fontSize: 24,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 16,
-    color: colors.text,
-    maxHeight: 100,
-    marginRight: 8,
-  },
-  sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    backgroundColor: colors.white,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
     overflow: 'hidden',
   },
-  sendButtonDisabled: {
-    opacity: 0.5,
+  bubbleRow: { flexDirection: 'row', marginBottom: spacing.sm },
+  rowMine: { justifyContent: 'flex-end' },
+  rowTheirs: { justifyContent: 'flex-start' },
+  bubble: { maxWidth: '80%', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.lg },
+  bubbleMine: { backgroundColor: colors.primary, borderBottomRightRadius: 4 },
+  bubbleTheirs: { backgroundColor: colors.white, borderBottomLeftRadius: 4 },
+  msgText: { fontSize: font.md, color: colors.text, lineHeight: 21 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginTop: 2 },
+  msgTime: { fontSize: font.xs, color: colors.textLight },
+  quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
+  quick: { backgroundColor: colors.white, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderColor: colors.primarySoft },
+  quickText: { color: colors.primary, fontSize: font.sm, fontWeight: '600' },
+  inputBar: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    backgroundColor: colors.white,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderLight,
   },
-  sendButtonGradient: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
+  sideBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  input: {
+    flex: 1,
+    minHeight: 44,
+    maxHeight: 120,
+    backgroundColor: colors.background,
+    borderRadius: 22,
+    paddingHorizontal: spacing.lg,
+    paddingTop: 11,
+    paddingBottom: 11,
+    fontSize: font.md,
+    color: colors.text,
   },
-  sendIcon: {
-    fontSize: 20,
-  },
+  sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  sendDisabled: { backgroundColor: colors.textLight },
 });

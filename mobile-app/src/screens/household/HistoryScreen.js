@@ -1,299 +1,174 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import { auth, db } from '../../config/firebase';
+import React, { useCallback, useState } from 'react';
+import { FlatList, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import { auth } from '../../config/firebase';
+import { getHouseholdPickups } from '../../services/pickupService';
+import { AppButton, AppHeader, BottomNav, Card, Chip, EmptyState, LoadingView, StatusBadge } from '../../components/ui';
+import { householdNavItems } from '../../navigation/navItems';
+import { ACTIVE_STATUSES } from '../../constants/status';
+import { formatDateBangla, formatRelativeDay, formatTaka, toBnDigits } from '../../utils/helpers';
 import colors from '../../constants/colors';
+import { font, spacing } from '../../constants/theme';
+
+const FILTERS = [
+  { key: 'all', label: 'সব' },
+  { key: 'active', label: 'চলমান' },
+  { key: 'completed', label: 'সম্পন্ন' },
+  { key: 'cancelled', label: 'বাতিল' },
+];
+
+const matchesFilter = (req, filter) => {
+  if (filter === 'active') return req.status === 'pending' || ACTIVE_STATUSES.includes(req.status);
+  if (filter === 'completed') return req.status === 'completed';
+  if (filter === 'cancelled') return req.status === 'cancelled';
+  return true;
+};
 
 export default function HistoryScreen({ navigation }) {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
+  const [filter, setFilter] = useState('all');
 
-  useEffect(() => {
-    loadHistory();
-  }, []);
-
-  const loadHistory = async () => {
+  const load = useCallback(async () => {
     try {
-      const user = auth.currentUser;
-      const q = query(
-        collection(db, 'pickupRequests'),
-        where('userId', '==', user.uid),
-        orderBy('createdAt', 'desc')
-      );
-      
-      const querySnapshot = await getDocs(q);
-      const data = [];
-      querySnapshot.forEach((doc) => {
-        data.push({ id: doc.id, ...doc.data() });
-      });
-      
-      setRequests(data);
-    } catch (error) {
-      console.log('Error loading history:', error);
+      setError(false);
+      setRequests(await getHouseholdPickups(auth.currentUser?.uid));
+    } catch (e) {
+      setError(true);
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
   };
 
-  const getStatusBadge = (status) => {
-    const statusMap = {
-      pending: { text: 'অপেক্ষমাণ', color: colors.secondary },
-      accepted: { text: 'গৃহীত', color: colors.primary },
-      completed: { text: 'সম্পন্ন', color: colors.success },
-      cancelled: { text: 'বাতিল', color: '#f44336' }
-    };
-    
-    return statusMap[status] || statusMap.pending;
+  const data = requests.filter((r) => matchesFilter(r, filter));
+
+  const renderItem = ({ item }) => {
+    const materials = item.materials || [];
+    const isActive = item.status === 'pending' || ACTIVE_STATUSES.includes(item.status);
+    const amount = item.status === 'completed' ? item.actualEarnings ?? item.estimatedEarnings : item.estimatedEarnings;
+    return (
+      <Card style={styles.card} onPress={() => navigation.navigate('TrackPickup', { requestId: item.id })}>
+        <View style={styles.cardTop}>
+          <StatusBadge status={item.status} />
+          <Text style={styles.date}>{formatDateBangla(item.createdAt, { short: true })}</Text>
+        </View>
+        <Text style={styles.materials} numberOfLines={1}>
+          {materials.slice(0, 3).map((m) => m.name).join(', ')}
+          {materials.length > 3 ? ` +${toBnDigits(materials.length - 3)}` : ''}
+        </Text>
+        <View style={styles.metaRow}>
+          <Ionicons name="calendar-outline" size={14} color={colors.textGray} />
+          <Text style={styles.meta}>
+            {formatRelativeDay(item.schedule?.date)} • {item.schedule?.timeSlot || '—'}
+          </Text>
+        </View>
+        <View style={styles.cardBottom}>
+          <View>
+            <Text style={styles.amountLabel}>{item.status === 'completed' ? 'প্রাপ্ত' : 'আনুমানিক'}</Text>
+            <Text style={styles.amount}>{formatTaka(amount)}</Text>
+          </View>
+          {isActive ? (
+            <AppButton title="ট্র্যাক" icon="navigate-outline" size="sm" variant="soft" onPress={() => navigation.navigate('TrackPickup', { requestId: item.id })} />
+          ) : null}
+          {item.status === 'completed' && !item.userRating && item.collectorId ? (
+            <AppButton
+              title="রেটিং দিন"
+              icon="star-outline"
+              size="sm"
+              variant="accent"
+              onPress={() =>
+                navigation.navigate('RateCollector', {
+                  requestId: item.id,
+                  collectorId: item.collectorId,
+                  collectorName: item.collectorName || 'সংগ্রাহক',
+                })
+              }
+            />
+          ) : null}
+          {item.status === 'completed' && item.userRating && item.paymentId ? (
+            <AppButton title="রসিদ" icon="receipt-outline" size="sm" variant="soft" onPress={() => navigation.navigate('PaymentReceipt', { paymentId: item.paymentId })} />
+          ) : null}
+        </View>
+      </Card>
+    );
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <LinearGradient
-        colors={[colors.primary, colors.primaryLight]}
-        style={styles.header}
-      >
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>← ফিরুন</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>ইতিহাস</Text>
-        <View style={{ width: 60 }} />
-      </LinearGradient>
+    <View style={styles.container}>
+      <AppHeader title="পিকআপ ইতিহাস" subtitle={`মোট ${toBnDigits(requests.length)}টি অনুরোধ`} onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined} />
+      <View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
+          {FILTERS.map((f) => (
+            <Chip key={f.key} label={f.label} active={filter === f.key} onPress={() => setFilter(f.key)} />
+          ))}
+        </ScrollView>
+      </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {loading ? (
-          <Text style={styles.loadingText}>লোড হচ্ছে...</Text>
-        ) : requests.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>📦</Text>
-            <Text style={styles.emptyTitle}>কোন ইতিহাস নেই</Text>
-            <Text style={styles.emptyText}>
-              আপনি এখনও কোন পিকআপ অনুরোধ করেননি
-            </Text>
-          </View>
-        ) : (
-          requests.map((request) => {
-            const status = getStatusBadge(request.status);
-            
-            return (
-              <View key={request.id} style={styles.requestCard}>
-                <View style={styles.requestHeader}>
-                  <View>
-                    <Text style={styles.requestDate}>
-                      {new Date(request.createdAt).toLocaleDateString('bn-BD')}
-                    </Text>
-                    <View style={styles.materialsList}>
-                      {request.materials.slice(0, 2).map((m, i) => (
-                        <Text key={i} style={styles.materialText}>
-                          {m.name}
-                        </Text>
-                      ))}
-                      {request.materials.length > 2 && (
-                        <Text style={styles.materialText}>
-                          +{request.materials.length - 2} আরো
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                  <View 
-                    style={[
-                      styles.statusBadge,
-                      { backgroundColor: `${status.color}20` }
-                    ]}
-                  >
-                    <Text style={[styles.statusText, { color: status.color }]}>
-                      {status.text}
-                    </Text>
-                  </View>
-                </View>
+      {loading ? (
+        <LoadingView />
+      ) : (
+        <FlatList
+          data={data}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          contentContainerStyle={styles.list}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
+          ListEmptyComponent={
+            error ? (
+              <EmptyState icon="cloud-offline-outline" title="লোড করা যায়নি" message="ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন" actionLabel="আবার চেষ্টা" onAction={load} />
+            ) : (
+              <EmptyState
+                icon="cube-outline"
+                title={filter === 'all' ? 'কোনো অনুরোধ নেই' : 'এই তালিকায় কিছু নেই'}
+                message="আপনার প্রথম পিকআপ অনুরোধ করুন এবং পুরনো জিনিস থেকে আয় করুন"
+                actionLabel="পিকআপ অনুরোধ করুন"
+                onAction={() => navigation.navigate('MaterialSelection')}
+              />
+            )
+          }
+        />
+      )}
 
-                <View style={styles.requestDetails}>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>📅 {new Date(request.schedule?.date).toLocaleDateString('bn-BD')}</Text>
-                    <Text style={styles.detailLabel}>⏰ {request.schedule?.timeSlot}</Text>
-                  </View>
-                  <View style={styles.requestFooter}>
-                    <Text style={styles.estimateText}>
-                      আনুমানিক: ৳{request.estimatedEarnings || 0}
-                    </Text>
-                    {(request.status === 'accepted' || request.status === 'on-the-way' || request.status === 'at-location') && (
-                      <TouchableOpacity
-                        style={styles.trackButton}
-                        onPress={() => navigation.navigate('TrackPickup', { requestId: request.id })}
-                      >
-                        <Text style={styles.trackButtonText}>📍 ট্র্যাক করুন</Text>
-                      </TouchableOpacity>
-                    )}
-                    {request.status === 'completed' && !request.userRating && (
-                      <TouchableOpacity
-                        style={styles.rateButton}
-                        onPress={() => navigation.navigate('RateCollector', {
-                          requestId: request.id,
-                          collectorId: request.collectorId,
-                          collectorName: request.collectorName || 'সংগ্রাহক'
-                        })}
-                      >
-                        <Text style={styles.rateButtonText}>⭐ রেটিং দিন</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
-              </View>
-            );
-          })
-        )}
-
-        <View style={{ height: 100 }} />
-      </ScrollView>
-    </SafeAreaView>
+      <BottomNav items={householdNavItems(navigation)} active="history" />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgCream,
-  },
-  header: {
+  container: { flex: 1, backgroundColor: colors.background },
+  filters: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.sm, gap: spacing.sm },
+  list: { padding: spacing.lg, paddingTop: spacing.sm, flexGrow: 1 },
+  card: { marginBottom: spacing.md },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  date: { fontSize: font.xs + 1, color: colors.textGray },
+  materials: { fontSize: font.md + 1, fontWeight: '700', color: colors.text, marginTop: spacing.md },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+  meta: { fontSize: font.sm, color: colors.textGray },
+  cardBottom: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-  },
-  backButton: {
-    fontSize: 16,
-    color: 'white',
-    fontWeight: '600',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: 'white',
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
-  loadingText: {
-    textAlign: 'center',
-    color: colors.textGray,
-    marginTop: 40,
-  },
-  emptyState: {
-    alignItems: 'center',
-    marginTop: 100,
-  },
-  emptyIcon: {
-    fontSize: 60,
-    marginBottom: 15,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.textDark,
-    marginBottom: 8,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: colors.textGray,
-    textAlign: 'center',
-  },
-  requestCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  requestHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  requestDate: {
-    fontSize: 13,
-    color: colors.textGray,
-    marginBottom: 6,
-  },
-  materialsList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  materialText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textDark,
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  requestDetails: {
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: 12,
+    borderTopColor: colors.borderLight,
+    gap: spacing.sm,
   },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  detailLabel: {
-    fontSize: 13,
-    color: colors.textGray,
-  },
-  requestFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  estimateText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  trackButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  trackButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  rateButton: {
-    backgroundColor: colors.secondary,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  rateButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  amountLabel: { fontSize: font.xs, color: colors.textGray },
+  amount: { fontSize: font.lg, fontWeight: '800', color: colors.primary },
 });

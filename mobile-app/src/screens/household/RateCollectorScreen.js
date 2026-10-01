@@ -1,19 +1,22 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  TextInput,
-  Alert,
-  Platform,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { doc, updateDoc, getDoc, setDoc, increment } from 'firebase/firestore';
-import { db, auth } from '../../config/firebase';
+import { KeyboardAvoidingView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Alert } from '../../utils/alert';
+import { submitReview } from '../../services/reviewService';
+import { AppButton, AppHeader, Avatar, BottomBar, Card, FormField, SectionHeader } from '../../components/ui';
 import colors from '../../constants/colors';
+import { font, radius, spacing } from '../../constants/theme';
+
+const TAGS = [
+  { id: 1, label: 'সময়মতো এসেছেন', icon: 'time-outline' },
+  { id: 2, label: 'ভদ্র ব্যবহার', icon: 'happy-outline' },
+  { id: 3, label: 'সঠিক ওজন', icon: 'scale-outline' },
+  { id: 4, label: 'ভালো দাম দিয়েছেন', icon: 'cash-outline' },
+  { id: 5, label: 'পেশাদার', icon: 'ribbon-outline' },
+  { id: 6, label: 'দ্রুত সেবা', icon: 'flash-outline' },
+];
+
+const RATING_LABELS = ['', 'খুবই খারাপ', 'খারাপ', 'মোটামুটি', 'খুব ভালো', 'চমৎকার!'];
 
 export default function RateCollectorScreen({ navigation, route }) {
   const { requestId, collectorId, collectorName } = route.params;
@@ -22,429 +25,101 @@ export default function RateCollectorScreen({ navigation, route }) {
   const [selectedTags, setSelectedTags] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const tags = [
-    { id: 1, label: 'সময়মতো এসেছেন', icon: '⏰' },
-    { id: 2, label: 'ভদ্র ব্যবহার', icon: '😊' },
-    { id: 3, label: 'পরিচ্ছন্নতা', icon: '✨' },
-    { id: 4, label: 'ভালো দাম দিয়েছেন', icon: '💰' },
-    { id: 5, label: 'পেশাদার', icon: '⭐' },
-    { id: 6, label: 'দ্রুত সেবা', icon: '⚡' },
-  ];
+  const toggleTag = (id) =>
+    setSelectedTags((prev) => (prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]));
 
-  const toggleTag = (tagId) => {
-    if (selectedTags.includes(tagId)) {
-      setSelectedTags(selectedTags.filter(id => id !== tagId));
-    } else {
-      setSelectedTags([...selectedTags, tagId]);
-    }
-  };
-
-  const handleSubmitRating = async () => {
+  const handleSubmit = async () => {
     if (rating === 0) {
-      Alert.alert('রেটিং দিন', 'অনুগ্রহ করে একটি রেটিং নির্বাচন করুন');
+      Alert.alert('রেটিং দিন', 'অনুগ্রহ করে ১ থেকে ৫ তারকার মধ্যে একটি রেটিং নির্বাচন করুন');
       return;
     }
-
     setLoading(true);
     try {
-      // Update pickup request with rating
-      await updateDoc(doc(db, 'pickupRequests', requestId), {
-        userRating: rating,
-        userReview: review,
-        ratingTags: selectedTags,
-        ratedAt: new Date().toISOString(),
-      });
-
-      // Update collector's average rating
-      const collectorRef = doc(db, 'users', collectorId);
-      const collectorDoc = await getDoc(collectorRef);
-      
-      if (collectorDoc.exists()) {
-        const collectorData = collectorDoc.data();
-        const currentRating = collectorData.rating || 0;
-        const totalRatings = collectorData.totalRatings || 0;
-        
-        const newTotalRatings = totalRatings + 1;
-        const newRating = ((currentRating * totalRatings) + rating) / newTotalRatings;
-        
-        await updateDoc(collectorRef, {
-          rating: newRating,
-          totalRatings: newTotalRatings,
-        });
-      }
-
-      // Store individual review for collector's profile
-      await setDoc(doc(db, 'reviews', `${requestId}_${collectorId}`), {
+      await submitReview({
         requestId,
         collectorId,
-        userId: auth.currentUser.uid,
         rating,
         review,
-        tags: selectedTags,
-        createdAt: new Date().toISOString(),
+        tags: TAGS.filter((t) => selectedTags.includes(t.id)).map((t) => t.label),
       });
-
-      Alert.alert(
-        'ধন্যবাদ! 🎉',
-        'আপনার রিভিউ সফলভাবে জমা হয়েছে',
-        [{ text: 'ঠিক আছে', onPress: () => navigation.goBack() }]
-      );
+      Alert.alert('ধন্যবাদ! 🎉', 'আপনার রিভিউ সফলভাবে জমা হয়েছে', [{ text: 'ঠিক আছে', onPress: () => navigation.goBack() }]);
     } catch (error) {
-      console.log('Error submitting rating:', error);
-      Alert.alert('ত্রুটি', 'রেটিং জমা দিতে সমস্যা হয়েছে');
+      Alert.alert('ত্রুটি', error?.code === 'permission-denied' ? 'এই পিকআপের জন্য আগেই রিভিউ দেওয়া হয়েছে' : 'রিভিউ জমা দিতে সমস্যা হয়েছে');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <LinearGradient
-        colors={[colors.primary, colors.primaryLight]}
-        style={styles.header}
-      >
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>← ফিরুন</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>রেটিং দিন</Text>
-        <View style={{ width: 60 }} />
-      </LinearGradient>
+    <View style={styles.container}>
+      <AppHeader title="রেটিং দিন" onBack={() => navigation.goBack()} />
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <Card style={styles.hero}>
+            <Avatar name={collectorName} size={72} />
+            <Text style={styles.name}>{collectorName}</Text>
+            <Text style={styles.question}>সংগ্রাহকের সেবা কেমন ছিল?</Text>
+            <View style={styles.stars}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity key={star} onPress={() => setRating(star)} hitSlop={6} accessibilityLabel={`${star} তারকা`}>
+                  <Ionicons name={star <= rating ? 'star' : 'star-outline'} size={40} color={star <= rating ? colors.accentLight : colors.border} />
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.ratingLabel}>{RATING_LABELS[rating] || 'তারকায় ট্যাপ করুন'}</Text>
+          </Card>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Collector Info */}
-        <View style={styles.collectorCard}>
-          <View style={styles.collectorAvatar}>
-            <Text style={styles.collectorAvatarText}>
-              {collectorName?.charAt(0) || '👷'}
-            </Text>
+          <SectionHeader title="কী ভালো লেগেছে? (ঐচ্ছিক)" />
+          <View style={styles.tags}>
+            {TAGS.map((tag) => {
+              const active = selectedTags.includes(tag.id);
+              return (
+                <TouchableOpacity key={tag.id} onPress={() => toggleTag(tag.id)} style={[styles.tag, active && styles.tagActive]}>
+                  <Ionicons name={tag.icon} size={16} color={active ? colors.white : colors.primary} />
+                  <Text style={[styles.tagText, active && { color: colors.white }]}>{tag.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
-          <Text style={styles.collectorName}>{collectorName}</Text>
-          <Text style={styles.instruction}>
-            সংগ্রাহকের সেবা কেমন ছিল?
-          </Text>
-        </View>
 
-        {/* Star Rating */}
-        <View style={styles.ratingCard}>
-          <Text style={styles.sectionTitle}>আপনার রেটিং</Text>
-          <View style={styles.starsContainer}>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <TouchableOpacity
-                key={star}
-                onPress={() => setRating(star)}
-                style={styles.starButton}
-              >
-                <Text style={[
-                  styles.star,
-                  star <= rating && styles.starSelected,
-                ]}>
-                  ⭐
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          {rating > 0 && (
-            <Text style={styles.ratingLabel}>
-              {rating === 1 && 'খুবই খারাপ'}
-              {rating === 2 && 'খারাপ'}
-              {rating === 3 && 'ভালো'}
-              {rating === 4 && 'খুব ভালো'}
-              {rating === 5 && 'চমৎকার'}
-            </Text>
-          )}
-        </View>
-
-        {/* Quick Tags */}
-        <View style={styles.tagsCard}>
-          <Text style={styles.sectionTitle}>দ্রুত ট্যাগ (ঐচ্ছিক)</Text>
-          <View style={styles.tagsContainer}>
-            {tags.map((tag) => (
-              <TouchableOpacity
-                key={tag.id}
-                style={[
-                  styles.tag,
-                  selectedTags.includes(tag.id) && styles.tagSelected,
-                ]}
-                onPress={() => toggleTag(tag.id)}
-              >
-                <Text style={styles.tagIcon}>{tag.icon}</Text>
-                <Text style={[
-                  styles.tagLabel,
-                  selectedTags.includes(tag.id) && styles.tagLabelSelected,
-                ]}>
-                  {tag.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Written Review */}
-        <View style={styles.reviewCard}>
-          <Text style={styles.sectionTitle}>রিভিউ লিখুন (ঐচ্ছিক)</Text>
-          <TextInput
-            style={styles.reviewInput}
-            placeholder="আপনার অভিজ্ঞতা শেয়ার করুন..."
-            placeholderTextColor={colors.textLight}
+          <SectionHeader title="মন্তব্য (ঐচ্ছিক)" />
+          <FormField
+            placeholder="আপনার অভিজ্ঞতা লিখুন..."
             value={review}
             onChangeText={setReview}
             multiline
-            numberOfLines={4}
-            textAlignVertical="top"
+            maxLength={500}
           />
-          <Text style={styles.reviewHint}>
-            অন্যদের সাহায্য করতে আপনার অভিজ্ঞতা লিখুন
-          </Text>
-        </View>
-
-        {/* Submit Button */}
-        <TouchableOpacity
-          style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-          onPress={handleSubmitRating}
-          disabled={loading}
-        >
-          <LinearGradient
-            colors={loading ? [colors.textGray, colors.textLight] : [colors.secondary, '#FFA726']}
-            style={styles.submitButtonGradient}
-          >
-            <Text style={styles.submitButtonText}>
-              {loading ? 'জমা হচ্ছে...' : '✓ রিভিউ জমা দিন'}
-            </Text>
-          </LinearGradient>
-        </TouchableOpacity>
-
-        {/* Skip Option */}
-        <TouchableOpacity
-          style={styles.skipButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.skipText}>পরে রেটিং দেব</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
+        </ScrollView>
+        <BottomBar>
+          <AppButton title="রিভিউ জমা দিন" icon="send-outline" onPress={handleSubmit} loading={loading} />
+          <AppButton title="পরে দেব" variant="ghost" onPress={() => navigation.goBack()} style={{ marginTop: spacing.xs }} />
+        </BottomBar>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 20,
-    paddingTop: 10,
-  },
-  backButton: {
-    fontSize: 16,
-    color: 'white',
-    fontWeight: '600',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: 'white',
-  },
-  content: {
-    flex: 1,
-  },
-  collectorCard: {
-    backgroundColor: 'white',
-    margin: 20,
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
-  },
-  collectorAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  collectorAvatarText: {
-    fontSize: 40,
-    color: 'white',
-    fontWeight: '700',
-  },
-  collectorName: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 8,
-  },
-  instruction: {
-    fontSize: 16,
-    color: colors.textGray,
-    textAlign: 'center',
-  },
-  ratingCard: {
-    backgroundColor: 'white',
-    margin: 20,
-    marginTop: 0,
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 16,
-  },
-  starsContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  starButton: {
-    padding: 4,
-  },
-  star: {
-    fontSize: 40,
-    opacity: 0.3,
-  },
-  starSelected: {
-    opacity: 1,
-  },
-  ratingLabel: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.secondary,
-  },
-  tagsCard: {
-    backgroundColor: 'white',
-    margin: 20,
-    marginTop: 0,
-    borderRadius: 16,
-    padding: 20,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
-  },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
+  container: { flex: 1, backgroundColor: colors.background },
+  body: { padding: spacing.lg, paddingBottom: spacing.xxl },
+  hero: { alignItems: 'center', paddingVertical: spacing.xxl },
+  name: { fontSize: font.xl, fontWeight: '800', color: colors.text, marginTop: spacing.md },
+  question: { fontSize: font.md, color: colors.textGray, marginTop: 4 },
+  stars: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xl },
+  ratingLabel: { marginTop: spacing.md, fontSize: font.md, fontWeight: '700', color: colors.accent },
+  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   tag: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    minHeight: 40,
+    borderRadius: radius.pill,
+    backgroundColor: colors.white,
+    borderWidth: 1.5,
+    borderColor: colors.primarySoft,
   },
-  tagSelected: {
-    backgroundColor: colors.primaryLight + '20',
-    borderColor: colors.primary,
-  },
-  tagIcon: {
-    fontSize: 16,
-    marginRight: 6,
-  },
-  tagLabel: {
-    fontSize: 14,
-    color: colors.text,
-  },
-  tagLabelSelected: {
-    color: colors.primary,
-    fontWeight: '600',
-  },
-  reviewCard: {
-    backgroundColor: 'white',
-    margin: 20,
-    marginTop: 0,
-    borderRadius: 16,
-    padding: 20,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
-  },
-  reviewInput: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: colors.text,
-    minHeight: 120,
-    marginBottom: 8,
-  },
-  reviewHint: {
-    fontSize: 14,
-    color: colors.textLight,
-  },
-  submitButton: {
-    margin: 20,
-    marginTop: 0,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  submitButtonDisabled: {
-    opacity: 0.6,
-  },
-  submitButtonGradient: {
-    padding: 18,
-    alignItems: 'center',
-  },
-  submitButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  skipButton: {
-    alignItems: 'center',
-    padding: 16,
-    marginBottom: 20,
-  },
-  skipText: {
-    fontSize: 16,
-    color: colors.textGray,
-    textDecorationLine: 'underline',
-  },
+  tagActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  tagText: { fontSize: font.sm, fontWeight: '600', color: colors.text },
 });

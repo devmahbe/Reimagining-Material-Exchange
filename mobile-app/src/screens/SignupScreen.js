@@ -1,447 +1,230 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
   KeyboardAvoidingView,
-  Platform,
   ScrollView,
-  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
-import { signInWithGoogleNative } from '../utils/googleAuth';
+import { Alert } from '../utils/alert';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { auth } from '../config/firebase';
+import { signInWithGoogle } from '../utils/googleAuth';
+import { authErrorMessage, createUserProfile, getUserProfile, goHome, ROLES } from '../services/userService';
+import { dedupeActiveAccount } from '../services/accountService';
+import { isValidEmail, isValidPhone, normalizePhone } from '../utils/helpers';
+import { AppButton, AppHeader, FormField } from '../components/ui';
+import { RoleOption } from './LoginScreen';
 import colors from '../constants/colors';
-import banglaText from '../constants/banglaText';
+import { font, radius, shadow, spacing } from '../constants/theme';
 
 export default function SignupScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
+  const [role, setRole] = useState(ROLES.HOUSEHOLD);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [password, setPassword] = useState('');
-  const [selectedRole, setSelectedRole] = useState('household');
+  const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
-  
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  const clearError = (key) => setErrors((e) => ({ ...e, [key]: null }));
+
+  const validate = () => {
+    const next = {};
+    if (!name.trim()) next.name = 'নাম লিখুন';
+    if (!isValidEmail(email)) next.email = 'সঠিক ইমেইল লিখুন';
+    if (!isValidPhone(phone)) next.phone = 'সঠিক ফোন নম্বর লিখুন (01XXXXXXXXX)';
+    if (password.length < 6) next.password = 'পাসওয়ার্ড অন্তত ৬ অক্ষরের হতে হবে';
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
   const handleSignup = async () => {
-    if (!name || !email || !phone || !password) {
-      Alert.alert('ত্রুটি', 'অনুগ্রহ করে সব ক্ষেত্র পূরণ করুন');
-      return;
-    }
-
-    if (password.length < 6) {
-      Alert.alert('ত্রুটি', 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে');
-      return;
-    }
-
+    if (!validate()) return;
     setLoading(true);
     try {
-      // Create user account
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      
-      // Save user data to Firestore
-      await setDoc(doc(db, 'users', userCredential.user.uid), {
-        name,
-        email,
-        phone,
-        address,
-        role: selectedRole,
-        createdAt: new Date().toISOString(),
+      const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      await updateProfile(cred.user, { displayName: name.trim() }).catch(() => {});
+      const profile = await createUserProfile(cred.user, {
+        name: name.trim(),
+        phone: normalizePhone(phone),
+        address: address.trim(),
+        role,
         authProvider: 'email',
       });
-
-      Alert.alert('সফল', 'নিবন্ধন সফল হয়েছে! এখন লগইন করুন।');
-      navigation.replace('Login');
+      // The user is already signed in after registration — go straight to the app
+      goHome(navigation, profile.role);
     } catch (error) {
-      let errorMsg = 'নিবন্ধন ব্যর্থ';
-      if (error.code === 'auth/email-already-in-use') {
-        errorMsg = 'এই ইমেইল ইতিমধ্যে ব্যবহৃত হয়েছে';
-      } else if (error.code === 'auth/invalid-email') {
-        errorMsg = 'ভুল ইমেইল ফরম্যাট';
-      } else if (error.code === 'auth/weak-password') {
-        errorMsg = 'দুর্বল পাসওয়ার্ড';
-      }
-      Alert.alert('ত্রুটি', errorMsg);
+      Alert.alert('নিবন্ধন ব্যর্থ', authErrorMessage(error, 'নিবন্ধন করা যায়নি'));
     } finally {
       setLoading(false);
     }
   };
-  
+
   const handleGoogleSignup = async () => {
-    setLoading(true);
+    setGoogleLoading(true);
     try {
-      if (Platform.OS === 'web') {
-        // Web: Use popup
-        const googleProvider = new GoogleAuthProvider();
-        const result = await signInWithPopup(auth, googleProvider);
-        const user = result.user;
-        
-        // Check if user already exists
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        
-        if (userDoc.exists()) {
-          Alert.alert('বিদ্যমান', 'এই অ্যাকাউন্ট ইতিমধ্যে আছে। লগইন করুন।');
-          navigation.replace('Login');
-        } else {
-          // Create new user with selected role
-          await setDoc(doc(db, 'users', user.uid), {
-            name: user.displayName,
-            email: user.email,
-            phone: '',
-            address: '',
-            role: selectedRole,
-            createdAt: new Date().toISOString(),
-            authProvider: 'google',
-          });
-          
-          Alert.alert('সফল', 'Google দিয়ে নিবন্ধন সফল হয়েছে!');
-          
-          // Navigate based on role
-          if (selectedRole === 'collector') {
-            navigation.replace('CollectorHome');
-          } else {
-            navigation.replace('HouseholdHome');
-          }
-        }
-      } else {
-        const userCredential = await signInWithGoogleNative();
-        if (!userCredential) {
-          // User cancelled the Google account picker
-          setLoading(false);
-          return;
-        }
-        const user = userCredential.user;
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (!userDoc.exists()) {
-          await setDoc(doc(db, 'users', user.uid), {
-            name: user.displayName,
-            email: user.email,
-            phone: phone || '',
-            address: address || '',
-            role: selectedRole,
-            createdAt: new Date().toISOString(),
-            authProvider: 'google',
-          });
-        }
-        const userData = userDoc.exists() ? userDoc.data() : { role: selectedRole };
-        if (userData?.role === 'collector') {
-          navigation.replace('CollectorHome');
-        } else {
-          navigation.replace('HouseholdHome');
-        }
+      const cred = await signInWithGoogle();
+      if (!cred) return; // cancelled
+      if (await dedupeActiveAccount()) {
+        const already = await getUserProfile(auth.currentUser?.uid);
+        Alert.alert('আগে থেকেই যোগ করা', 'এই অ্যাকাউন্টে এই ডিভাইসে আগে থেকেই লগইন করা আছে।');
+        if (already) goHome(navigation, already.role);
+        return;
       }
+      const existing = await getUserProfile(cred.user.uid);
+      if (existing) {
+        Alert.alert('স্বাগতম ফিরে!', 'এই Google অ্যাকাউন্ট দিয়ে আগেই নিবন্ধন করা হয়েছে।');
+        goHome(navigation, existing.role);
+        return;
+      }
+      const profile = await createUserProfile(cred.user, {
+        name: name.trim() || cred.user.displayName || '',
+        phone: isValidPhone(phone) ? normalizePhone(phone) : '',
+        address: address.trim(),
+        role,
+        authProvider: 'google',
+      });
+      goHome(navigation, profile.role);
     } catch (error) {
-      console.log('Google Sign-Up Error:', error);
-      Alert.alert('ত্রুটি', 'Google নিবন্ধন ব্যর্থ');
-      setLoading(false);
+      Alert.alert('Google নিবন্ধন ব্যর্থ', authErrorMessage(error, 'Google দিয়ে নিবন্ধন করা যায়নি'));
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
+  const busy = loading || googleLoading;
+
   return (
-    <LinearGradient
-      colors={['#667eea', '#764ba2']}
-      style={styles.container}
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-      >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.content}>
-            {/* Logo */}
-            <View style={styles.logoContainer}>
-              <Text style={styles.logoEmoji}>♻️</Text>
-              <Text style={styles.logoText}>ভাঙ্গারি এক্সচেঞ্জ</Text>
+    <View style={styles.container}>
+      <AppHeader title="নতুন অ্যাকাউন্ট" subtitle="কয়েক ধাপে নিবন্ধন সম্পন্ন করুন" onBack={() => navigation.goBack()} />
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+        <ScrollView
+          contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.xxl }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.sectionLabel}>আপনি কে?</Text>
+          <View style={styles.roleRow}>
+            <RoleOption role={ROLES.HOUSEHOLD} selected={role === ROLES.HOUSEHOLD} onPress={() => setRole(ROLES.HOUSEHOLD)} />
+            <RoleOption role={ROLES.COLLECTOR} selected={role === ROLES.COLLECTOR} onPress={() => setRole(ROLES.COLLECTOR)} />
+          </View>
+
+          <View style={styles.card}>
+            <FormField
+              label="পূর্ণ নাম"
+              icon="person-outline"
+              placeholder="আপনার নাম"
+              value={name}
+              onChangeText={(t) => { setName(t); clearError('name'); }}
+              autoComplete="name"
+              error={errors.name}
+            />
+            <FormField
+              label="ইমেইল"
+              icon="mail-outline"
+              placeholder="example@email.com"
+              value={email}
+              onChangeText={(t) => { setEmail(t); clearError('email'); }}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+              error={errors.email}
+            />
+            <FormField
+              label="ফোন নম্বর"
+              icon="call-outline"
+              placeholder="01XXXXXXXXX"
+              value={phone}
+              onChangeText={(t) => { setPhone(t); clearError('phone'); }}
+              keyboardType="phone-pad"
+              maxLength={14}
+              error={errors.phone}
+            />
+            <FormField
+              label="ঠিকানা (ঐচ্ছিক)"
+              icon="location-outline"
+              placeholder="বাড়ি, রাস্তা, এলাকা, শহর"
+              value={address}
+              onChangeText={setAddress}
+            />
+            <FormField
+              label="পাসওয়ার্ড"
+              icon="lock-closed-outline"
+              placeholder="কমপক্ষে ৬ অক্ষর"
+              value={password}
+              onChangeText={(t) => { setPassword(t); clearError('password'); }}
+              secureTextEntry={!showPassword}
+              autoComplete="new-password"
+              error={errors.password}
+              right={
+                <TouchableOpacity onPress={() => setShowPassword((p) => !p)} hitSlop={10}>
+                  <Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color={colors.textGray} />
+                </TouchableOpacity>
+              }
+            />
+
+            <AppButton title="নিবন্ধন করুন" icon="person-add-outline" onPress={handleSignup} loading={loading} disabled={googleLoading} />
+
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>অথবা</Text>
+              <View style={styles.dividerLine} />
             </View>
 
-            {/* Signup Form */}
-            <View style={styles.formContainer}>
-              <Text style={styles.title}>{banglaText.signup}</Text>
+            <TouchableOpacity
+              style={[styles.googleBtn, busy && { opacity: 0.6 }]}
+              onPress={handleGoogleSignup}
+              disabled={busy}
+            >
+              <Ionicons name="logo-google" size={20} color="#EA4335" />
+              <Text style={styles.googleText}>
+                {googleLoading ? 'অপেক্ষা করুন...' : `Google দিয়ে ${role === ROLES.COLLECTOR ? 'সংগ্রাহক' : 'পরিবার'} হিসেবে নিবন্ধন`}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-              {/* Role Selection */}
-              <Text style={styles.sectionTitle}>{banglaText.selectRole}</Text>
-              <View style={styles.roleSelector}>
-                <TouchableOpacity
-                  style={[
-                    styles.roleOption,
-                    selectedRole === 'household' && styles.roleOptionSelected,
-                  ]}
-                  onPress={() => setSelectedRole('household')}
-                >
-                  <Text style={styles.roleIcon}>🏠</Text>
-                  <Text style={styles.roleName}>{banglaText.household}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.roleOption,
-                    selectedRole === 'collector' && styles.roleOptionSelected,
-                  ]}
-                  onPress={() => setSelectedRole('collector')}
-                >
-                  <Text style={styles.roleIcon}>👷</Text>
-                  <Text style={styles.roleName}>{banglaText.collector}</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>{banglaText.name}</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="আপনার নাম লিখুন"
-                  placeholderTextColor={colors.textLight}
-                  value={name}
-                  onChangeText={setName}
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>{banglaText.email}</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="আপনার ইমেইল লিখুন"
-                  placeholderTextColor={colors.textLight}
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>{banglaText.phone}</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="ফোন নম্বর লিখুন"
-                  placeholderTextColor={colors.textLight}
-                  value={phone}
-                  onChangeText={setPhone}
-                  keyboardType="phone-pad"
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>{banglaText.address}</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="আপনার ঠিকানা লিখুন"
-                  placeholderTextColor={colors.textLight}
-                  value={address}
-                  onChangeText={setAddress}
-                  multiline
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>{banglaText.password}</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="পাসওয়ার্ড লিখুন (৬+ অক্ষর)"
-                  placeholderTextColor={colors.textLight}
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                />
-              </View>
-
-              <TouchableOpacity
-                style={styles.signupButton}
-                onPress={handleSignup}
-                disabled={loading}
-              >
-                <Text style={styles.signupButtonText}>
-                  {loading ? banglaText.loading : banglaText.signup}
-                </Text>
-              </TouchableOpacity>
-
-              <View style={styles.divider}>
-                <Text>অথবা</Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.googleButton}
-                onPress={handleGoogleSignup}
-                disabled={loading}
-              >
-                <Text style={styles.googleIcon}>🔍</Text>
-                <Text style={styles.googleButtonText}>Google দিয়ে নিবন্ধন করুন</Text>
-              </TouchableOpacity>
-
-              <View style={styles.loginContainer}>
-                <Text style={styles.loginText}>{banglaText.alreadyHaveAccount} </Text>
-                <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-                  <Text style={styles.loginLink}>{banglaText.login}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+          <View style={styles.loginRow}>
+            <Text style={styles.loginText}>ইতিমধ্যে অ্যাকাউন্ট আছে?</Text>
+            <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
+              <Text style={styles.loginLink}> প্রবেশ করুন</Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 30,
-    paddingTop: 60,
-    paddingBottom: 40,
-  },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  logoEmoji: {
-    fontSize: 60,
-    marginBottom: 8,
-  },
-  logoText: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: 'white',
-  },
-  formContainer: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 25,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: colors.textDark,
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textDark,
-    marginBottom: 12,
-  },
-  roleSelector: {
+  container: { flex: 1, backgroundColor: colors.background },
+  scroll: { padding: spacing.lg },
+  sectionLabel: { fontSize: font.md, fontWeight: '700', color: colors.text, marginBottom: spacing.md, marginTop: spacing.sm },
+  roleRow: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.lg },
+  card: { backgroundColor: colors.white, borderRadius: radius.xl, padding: spacing.xl, ...shadow.sm },
+  divider: { flexDirection: 'row', alignItems: 'center', marginVertical: spacing.xl },
+  dividerLine: { flex: 1, height: 1, backgroundColor: colors.borderLight },
+  dividerText: { marginHorizontal: spacing.md, color: colors.textLight, fontSize: font.sm },
+  googleBtn: {
     flexDirection: 'row',
-    gap: 15,
-    marginBottom: 20,
-  },
-  roleOption: {
-    flex: 1,
-    backgroundColor: 'white',
-    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+    minHeight: 52,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: 16,
-    padding: 20,
-    alignItems: 'center',
+    paddingHorizontal: spacing.md,
   },
-  roleOptionSelected: {
-    borderColor: colors.primary,
-    backgroundColor: 'rgba(46, 125, 50, 0.05)',
-  },
-  roleIcon: {
-    fontSize: 36,
-    marginBottom: 8,
-  },
-  roleName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textDark,
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.textDark,
-    marginBottom: 8,
-  },
-  input: {
-    borderWidth: 2,
-    borderColor: colors.border,
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 15,
-    color: colors.textDark,
-  },
-  signupButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    padding: 18,
-    alignItems: 'center',
-    marginTop: 10,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  signupButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 15,
-    justifyContent: 'center',
-  },
-  googleButton: {
-    backgroundColor: 'white',
-    borderWidth: 2,
-    borderColor: colors.border,
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  googleIcon: {
-    fontSize: 20,
-    marginRight: 10,
-  },
-  googleButtonText: {
-    color: colors.textDark,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  loginContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 20,
-  },
-  loginText: {
-    fontSize: 14,
-    color: colors.textGray,
-  },
-  loginLink: {
-    fontSize: 14,
-    color: colors.primary,
-    fontWeight: '600',
-  },
+  googleText: { fontSize: font.sm + 1, fontWeight: '600', color: colors.text, flexShrink: 1 },
+  loginRow: { flexDirection: 'row', justifyContent: 'center', marginTop: spacing.xl },
+  loginText: { color: colors.textGray, fontSize: font.sm + 1 },
+  loginLink: { color: colors.primary, fontWeight: '700', fontSize: font.sm + 1 },
 });

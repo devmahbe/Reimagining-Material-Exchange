@@ -1,363 +1,264 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  RefreshControl,
-  StatusBar,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useCallback, useState } from 'react';
+import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import { db, auth } from '../../config/firebase';
+import { useFocusEffect } from '@react-navigation/native';
+import { auth } from '../../config/firebase';
+import { Alert } from '../../utils/alert';
+import { getUserProfile } from '../../services/userService';
+import { acceptPickup, getCollectorPickups, getPendingPickups, pickupErrorMessage } from '../../services/pickupService';
+import { getUnreadCount } from '../../services/chatService';
+import { collectorNavItems } from '../../navigation/navItems';
+import { AppButton, AppHeader, BottomNav, Card, EmptyState, IconButton, LoadingView, StatusBadge } from '../../components/ui';
+import { ACTIVE_STATUSES } from '../../constants/status';
+import { formatRelativeDay, formatTaka, isSameDay, toBnDigits, toDate } from '../../utils/helpers';
 import colors from '../../constants/colors';
+import { font, radius, spacing } from '../../constants/theme';
+
+export { collectorNavItems };
+
+const materialSummary = (materials = []) => {
+  if (materials.length === 0) return 'কোনো উপাদান নেই';
+  if (materials.length === 1) return `${materials[0].name} (${toBnDigits(materials[0].quantity)} ${materials[0].unit})`;
+  return `${materials[0].name} + আরো ${toBnDigits(materials.length - 1)}টি`;
+};
 
 export default function CollectorHomeScreen({ navigation }) {
-  const [availableRequests, setAvailableRequests] = useState([]);
-  const [stats, setStats] = useState({ todayPickups: 0, weekEarnings: 0, pendingRequests: 0 });
+  const [profile, setProfile] = useState(null);
+  const [pending, setPending] = useState([]);
+  const [mine, setMine] = useState([]);
+  const [tab, setTab] = useState('new');
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
+  const [acceptingId, setAcceptingId] = useState(null);
+  const [unread, setUnread] = useState(0);
 
-  useEffect(() => { loadData(); }, []);
-
-  const loadData = async () => {
+  const load = useCallback(async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
     try {
-      const user = auth.currentUser;
-
-      const requestsQuery = query(
-        collection(db, 'pickupRequests'),
-        where('status', '==', 'pending'),
-        orderBy('createdAt', 'desc')
-      );
-      const snapshot = await getDocs(requestsQuery);
-      const requests = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      setAvailableRequests(requests);
-
-      const completedQuery = query(
-        collection(db, 'pickupRequests'),
-        where('collectorId', '==', user.uid),
-        where('status', '==', 'completed')
-      );
-      const completedSnapshot = await getDocs(completedQuery);
-
-      const now = new Date();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
-
-      let todayPickups = 0;
-      let weekEarnings = 0;
-      completedSnapshot.forEach(d => {
-        const p = d.data();
-        const completed = p.completedAt ? new Date(p.completedAt) : null;
-        if (completed) {
-          if (completed >= todayStart) todayPickups++;
-          if (completed >= weekStart) weekEarnings += p.actualEarnings || p.estimatedEarnings || 0;
-        }
-      });
-
-      setStats({ todayPickups, weekEarnings, pendingRequests: requests.length });
-    } catch (error) {
-      console.log('Error loading data:', error);
+      setError(false);
+      const [p, pendingList, myList, u] = await Promise.all([
+        getUserProfile(uid).catch(() => null),
+        getPendingPickups(),
+        getCollectorPickups(uid),
+        getUnreadCount(uid).catch(() => 0),
+      ]);
+      setProfile(p);
+      setPending(pendingList.filter((r) => r.userId !== uid));
+      setMine(myList);
+      setUnread(u);
+    } catch (e) {
+      setError(true);
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await load();
     setRefreshing(false);
   };
 
-  const getPickupTimeLabel = (date, timeSlot) => {
-    const pickupDate = new Date(date);
-    const diffDays = Math.ceil((pickupDate - new Date()) / (1000 * 60 * 60 * 24));
-    let dateLabel = diffDays === 0 ? 'আজ' : diffDays === 1 ? 'আগামীকাল'
-      : pickupDate.toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' });
-    return `${dateLabel}, ${timeSlot}`;
-  };
+  const handleAccept = (request) =>
+    Alert.alert('পিকআপ গ্রহণ করবেন?', `${materialSummary(request.materials)}\n${request.address || ''}`, [
+      { text: 'বাতিল', style: 'cancel' },
+      {
+        text: 'গ্রহণ করুন',
+        onPress: async () => {
+          setAcceptingId(request.id);
+          try {
+            await acceptPickup(request.id, profile);
+            navigation.navigate('RequestDetails', { requestId: request.id });
+          } catch (e) {
+            Alert.alert('গ্রহণ করা যায়নি', pickupErrorMessage(e));
+            load();
+          } finally {
+            setAcceptingId(null);
+          }
+        },
+      },
+    ]);
 
-  const getMaterialSummary = (materials) => {
-    if (!materials || materials.length === 0) return 'কোন উপাদান নেই';
-    if (materials.length === 1) return `${materials[0].name} (${materials[0].quantity} ${materials[0].unit})`;
-    return `${materials[0].name} + ${materials.length - 1} আরো`;
-  };
+  // Stats
+  const now = new Date();
+  const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+  const completed = mine.filter((r) => r.status === 'completed');
+  const todayCount = completed.filter((r) => toDate(r.completedAt) && isSameDay(toDate(r.completedAt), now)).length;
+  const weekTotal = completed
+    .filter((r) => toDate(r.completedAt) >= weekStart)
+    .reduce((s, r) => s + (r.actualEarnings || r.estimatedEarnings || 0), 0);
+  const active = mine.filter((r) => ACTIVE_STATUSES.includes(r.status));
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.primaryDark} />
+  const data = tab === 'new' ? pending : active;
 
-      {/* ── Header ── */}
-      <LinearGradient colors={[colors.primaryDark, colors.primary]} style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.headerGreeting}>স্বাগতম</Text>
-          <Text style={styles.headerTitle}>সংগ্রাহক ড্যাশবোর্ড</Text>
+  const renderItem = ({ item }) => (
+    <Card style={styles.card} onPress={() => navigation.navigate('RequestDetails', { requestId: item.id })}>
+      <View style={styles.cardTop}>
+        <View style={styles.timeChip}>
+          <Ionicons name="time-outline" size={14} color={colors.primary} />
+          <Text style={styles.timeText}>
+            {formatRelativeDay(item.schedule?.date)}, {item.schedule?.timeSlot || '—'}
+          </Text>
         </View>
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={[styles.headerIconBtn, stats.pendingRequests > 0 && styles.headerIconBtnAlert]}
-            onPress={() => navigation.navigate('Notifications')}
-          >
-            <Ionicons name="notifications-outline" size={22} color="#fff" />
-            {stats.pendingRequests > 0 && (
-              <View style={styles.badgeDot}>
-                <Text style={styles.badgeDotText}>{stats.pendingRequests}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerIconBtn} onPress={() => navigation.navigate('CollectorStats')}>
-            <Ionicons name="bar-chart-outline" size={22} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
-
-      {/* ── Stats Row ── */}
-      <View style={styles.statsRow}>
-        <TouchableOpacity style={styles.statCard} onPress={() => navigation.navigate('CollectorStats')}>
-          <View style={[styles.statIconBox, { backgroundColor: '#EFF6FF' }]}>
-            <Ionicons name="cube-outline" size={22} color="#3B82F6" />
-          </View>
-          <Text style={styles.statValue}>{stats.todayPickups}</Text>
-          <Text style={styles.statLabel}>আজকের পিকআপ</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.statCard} onPress={() => navigation.navigate('Earnings')}>
-          <View style={[styles.statIconBox, { backgroundColor: '#ECFDF5' }]}>
-            <Ionicons name="cash-outline" size={22} color={colors.primary} />
-          </View>
-          <Text style={styles.statValue}>৳{stats.weekEarnings}</Text>
-          <Text style={styles.statLabel}>সপ্তাহের আয়</Text>
-        </TouchableOpacity>
-
-        <View style={styles.statCard}>
-          <View style={[styles.statIconBox, { backgroundColor: '#FFF7ED' }]}>
-            <Ionicons name="time-outline" size={22} color={colors.accent} />
-          </View>
-          <Text style={styles.statValue}>{stats.pendingRequests}</Text>
-          <Text style={styles.statLabel}>নতুন অনুরোধ</Text>
-        </View>
-      </View>
-
-      {/* ── List header ── */}
-      <View style={styles.listHeader}>
-        <Text style={styles.listTitle}>উপলব্ধ পিকআপ অনুরোধ</Text>
-        <TouchableOpacity style={styles.refreshBtn} onPress={onRefresh}>
-          <Ionicons name="refresh-outline" size={16} color={colors.primary} />
-          <Text style={styles.refreshLabel}>রিফ্রেশ</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView
-        style={styles.list}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-      >
-        {availableRequests.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <View style={styles.emptyIconWrap}>
-              <MaterialCommunityIcons name="package-variant" size={48} color={colors.textLight} />
-            </View>
-            <Text style={styles.emptyTitle}>কোন নতুন অনুরোধ নেই</Text>
-            <Text style={styles.emptySubtitle}>নতুন অনুরোধ আসলে এখানে দেখাবে</Text>
-          </View>
+        {tab === 'new' ? (
+          <Text style={styles.price}>{formatTaka(item.estimatedEarnings)}</Text>
         ) : (
-          availableRequests.map(request => (
-            <TouchableOpacity
-              key={request.id}
-              style={styles.requestCard}
-              onPress={() => navigation.navigate('RequestDetails', { requestId: request.id })}
-              activeOpacity={0.85}
-            >
-              {/* Card top */}
-              <View style={styles.cardTop}>
-                <View style={styles.timeChip}>
-                  <Ionicons name="time-outline" size={13} color={colors.primary} style={{ marginRight: 4 }} />
-                  <Text style={styles.timeText}>
-                    {getPickupTimeLabel(request.schedule?.date, request.schedule?.timeSlot)}
-                  </Text>
-                </View>
-                <View style={styles.priceChip}>
-                  <Text style={styles.priceText}>৳{request.estimatedEarnings || 0}</Text>
-                </View>
-              </View>
-
-              {/* Card body */}
-              <View style={styles.cardBody}>
-                <View style={styles.infoRow}>
-                  <MaterialCommunityIcons name="recycle" size={16} color={colors.primary} />
-                  <Text style={styles.infoText}>{getMaterialSummary(request.materials)}</Text>
-                </View>
-                <View style={styles.infoRow}>
-                  <Ionicons name="location-outline" size={16} color={colors.textGray} />
-                  <Text style={styles.infoText} numberOfLines={1}>
-                    {request.address || 'ঠিকানা উল্লেখ নেই'}
-                  </Text>
-                </View>
-                {request.phone && (
-                  <View style={styles.infoRow}>
-                    <Ionicons name="call-outline" size={16} color={colors.textGray} />
-                    <Text style={styles.infoText}>{request.phone}</Text>
-                  </View>
-                )}
-              </View>
-
-              {/* Card footer */}
-              <View style={styles.cardFooter}>
-                <TouchableOpacity
-                  style={styles.detailsBtn}
-                  onPress={() => navigation.navigate('RequestDetails', { requestId: request.id })}
-                >
-                  <Text style={styles.detailsBtnText}>বিস্তারিত</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.acceptBtn}
-                  onPress={() => navigation.navigate('RequestDetails', { requestId: request.id, autoAccept: true })}
-                >
-                  <Ionicons name="checkmark-outline" size={16} color="#fff" />
-                  <Text style={styles.acceptBtnText}>গ্রহণ করুন</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          ))
+          <StatusBadge status={item.status} />
         )}
-        <View style={{ height: 16 }} />
-      </ScrollView>
-
-      {/* ── Bottom Nav ── */}
-      <View style={styles.bottomNav}>
-        <NavItem icon="home" label="হোম" active onPress={() => {}} />
-        <NavItem icon="chatbubbles-outline" label="বার্তা" onPress={() => navigation.navigate('Messages')} />
-        <NavItem icon="cash-outline" label="আয়" onPress={() => navigation.navigate('Earnings')} />
-        <NavItem icon="settings-outline" label="সেটিংস" onPress={() => navigation.navigate('Settings')} />
       </View>
-    </SafeAreaView>
+      <View style={styles.infoRow}>
+        <MaterialCommunityIcons name="recycle" size={17} color={colors.primary} />
+        <Text style={styles.infoText} numberOfLines={1}>{materialSummary(item.materials)}</Text>
+      </View>
+      <View style={styles.infoRow}>
+        <Ionicons name="location-outline" size={17} color={colors.textGray} />
+        <Text style={styles.infoText} numberOfLines={2}>{item.address || 'ঠিকানা উল্লেখ নেই'}</Text>
+      </View>
+      <View style={styles.actions}>
+        <AppButton
+          title="বিস্তারিত"
+          variant="outline"
+          size="sm"
+          style={{ flex: 1 }}
+          onPress={() => navigation.navigate('RequestDetails', { requestId: item.id })}
+        />
+        {tab === 'new' ? (
+          <AppButton
+            title="গ্রহণ করুন"
+            icon="checkmark"
+            size="sm"
+            style={{ flex: 1 }}
+            loading={acceptingId === item.id}
+            disabled={!!acceptingId}
+            onPress={() => handleAccept(item)}
+          />
+        ) : null}
+      </View>
+    </Card>
   );
-}
 
-function NavItem({ icon, label, active, onPress }) {
   return (
-    <TouchableOpacity style={styles.navItem} onPress={onPress}>
-      <Ionicons
-        name={active ? icon.replace('-outline', '') : icon}
-        size={24}
-        color={active ? colors.primary : colors.textLight}
-      />
-      <Text style={[styles.navLabel, active && styles.navLabelActive]}>{label}</Text>
-    </TouchableOpacity>
+    <View style={styles.container}>
+      <AppHeader
+        title={profile?.name ? `স্বাগতম, ${profile.name.split(' ')[0]}` : 'সংগ্রাহক ড্যাশবোর্ড'}
+        subtitle="আজকের পিকআপগুলো দেখে নিন"
+        right={
+          <>
+            <IconButton icon="notifications-outline" badge={pending.length} onPress={() => navigation.navigate('Notifications')} accessibilityLabel="বিজ্ঞপ্তি" />
+            <IconButton icon="stats-chart-outline" onPress={() => navigation.navigate('CollectorStats')} accessibilityLabel="পরিসংখ্যান" />
+          </>
+        }
+      >
+        <View style={styles.statsRow}>
+          <TouchableOpacity style={styles.stat} onPress={() => navigation.navigate('CollectorStats')}>
+            <Text style={styles.statValue}>{toBnDigits(todayCount)}</Text>
+            <Text style={styles.statLabel}>আজ সম্পন্ন</Text>
+          </TouchableOpacity>
+          <View style={styles.statDivider} />
+          <TouchableOpacity style={styles.stat} onPress={() => navigation.navigate('Earnings')}>
+            <Text style={styles.statValue}>{formatTaka(weekTotal)}</Text>
+            <Text style={styles.statLabel}>এই সপ্তাহ</Text>
+          </TouchableOpacity>
+          <View style={styles.statDivider} />
+          <TouchableOpacity style={styles.stat} onPress={() => setTab('mine')}>
+            <Text style={styles.statValue}>{toBnDigits(active.length)}</Text>
+            <Text style={styles.statLabel}>চলমান</Text>
+          </TouchableOpacity>
+        </View>
+      </AppHeader>
+
+      <View style={styles.tabs}>
+        {[
+          { key: 'new', label: 'নতুন অনুরোধ', count: pending.length },
+          { key: 'mine', label: 'আমার পিকআপ', count: active.length },
+        ].map((t) => (
+          <TouchableOpacity key={t.key} style={[styles.tab, tab === t.key && styles.tabActive]} onPress={() => setTab(t.key)}>
+            <Text style={[styles.tabText, tab === t.key && styles.tabTextActive]}>{t.label}</Text>
+            <View style={[styles.tabCount, tab === t.key && styles.tabCountActive]}>
+              <Text style={[styles.tabCountText, tab === t.key && { color: colors.primary }]}>{toBnDigits(t.count)}</Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {loading ? (
+        <LoadingView />
+      ) : (
+        <FlatList
+          data={data}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          contentContainerStyle={styles.list}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
+          ListEmptyComponent={
+            error ? (
+              <EmptyState icon="cloud-offline-outline" title="লোড করা যায়নি" message="ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন" actionLabel="আবার চেষ্টা" onAction={load} />
+            ) : tab === 'new' ? (
+              <EmptyState icon="cube-outline" title="কোনো নতুন অনুরোধ নেই" message="নতুন পিকআপ অনুরোধ আসলে এখানে দেখা যাবে। নিচে টেনে রিফ্রেশ করুন।" />
+            ) : (
+              <EmptyState icon="bicycle-outline" title="কোনো চলমান পিকআপ নেই" message="নতুন অনুরোধ গ্রহণ করলে এখানে দেখা যাবে" actionLabel="নতুন অনুরোধ দেখুন" onAction={() => setTab('new')} />
+            )
+          }
+        />
+      )}
+
+      <BottomNav items={collectorNavItems(navigation, unread)} active="home" />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-
-  // Header
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: 14, paddingBottom: 18,
-  },
-  headerLeft: { flex: 1 },
-  headerGreeting: { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginBottom: 2 },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: '#fff' },
-  headerActions: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  headerIconBtn: {
-    width: 40, height: 40, borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  headerIconBtnAlert: { backgroundColor: 'rgba(255,255,255,0.25)' },
-  badgeDot: {
-    position: 'absolute', top: -4, right: -4,
-    backgroundColor: '#EF4444',
-    borderRadius: 10, minWidth: 18, height: 18,
-    justifyContent: 'center', alignItems: 'center',
-    paddingHorizontal: 4,
-    borderWidth: 1.5, borderColor: colors.primary,
-  },
-  badgeDotText: { color: '#fff', fontSize: 10, fontWeight: '700' },
-
-  // Stats
   statsRow: {
-    flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 14, gap: 10,
+    flexDirection: 'row',
+    marginTop: spacing.lg,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
   },
-  statCard: {
-    flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 14, alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06,
-    shadowRadius: 6, elevation: 2,
+  stat: { flex: 1, alignItems: 'center' },
+  statValue: { fontSize: font.lg, fontWeight: '800', color: colors.white },
+  statLabel: { fontSize: font.xs + 1, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
+  statDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.25)' },
+  tabs: {
+    flexDirection: 'row',
+    margin: spacing.lg,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.white,
+    borderRadius: radius.md,
+    padding: 4,
   },
-  statIconBox: {
-    width: 44, height: 44, borderRadius: 12,
-    justifyContent: 'center', alignItems: 'center', marginBottom: 8,
-  },
-  statValue: { fontSize: 20, fontWeight: '700', color: colors.textDark, marginBottom: 3 },
-  statLabel: { fontSize: 10, color: colors.textGray, textAlign: 'center', fontWeight: '500' },
-
-  // List header
-  listHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 16, paddingBottom: 10,
-  },
-  listTitle: { fontSize: 15, fontWeight: '700', color: colors.textDark },
-  refreshBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  refreshLabel: { fontSize: 13, color: colors.primary, fontWeight: '600' },
-
-  // Requests list
-  list: { flex: 1, paddingHorizontal: 16 },
-
-  // Empty state
-  emptyBox: { alignItems: 'center', marginTop: 60 },
-  emptyIconWrap: {
-    width: 90, height: 90, borderRadius: 24,
-    backgroundColor: colors.surface,
-    justifyContent: 'center', alignItems: 'center', marginBottom: 16,
-  },
-  emptyTitle: { fontSize: 17, fontWeight: '600', color: colors.textDark, marginBottom: 6 },
-  emptySubtitle: { fontSize: 13, color: colors.textLight },
-
-  // Request card
-  requestCard: {
-    backgroundColor: '#fff', borderRadius: 18, marginBottom: 14, padding: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.07,
-    shadowRadius: 10, elevation: 3,
-  },
-  cardTop: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border,
-  },
+  tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 42, borderRadius: radius.sm + 2 },
+  tabActive: { backgroundColor: colors.primary },
+  tabText: { fontSize: font.sm + 1, fontWeight: '700', color: colors.textGray },
+  tabTextActive: { color: colors.white },
+  tabCount: { minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  tabCountActive: { backgroundColor: colors.white },
+  tabCountText: { fontSize: font.xs, fontWeight: '800', color: colors.textGray },
+  list: { padding: spacing.lg, paddingTop: spacing.sm, flexGrow: 1 },
+  card: { marginBottom: spacing.md },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
   timeChip: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.surface, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
-  },
-  timeText: { fontSize: 13, fontWeight: '600', color: colors.primary },
-  priceChip: {
-    backgroundColor: colors.surface,
-    paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8,
-  },
-  priceText: { fontSize: 16, fontWeight: '700', color: colors.primaryDark },
-  cardBody: { gap: 8, marginBottom: 14 },
-  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  infoText: { fontSize: 13, color: colors.textBody, flex: 1 },
-  cardFooter: { flexDirection: 'row', gap: 10 },
-  detailsBtn: {
-    flex: 1, paddingVertical: 11, borderRadius: 12, backgroundColor: colors.surface,
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.primarySoft,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    flexShrink: 1,
   },
-  detailsBtnText: { fontSize: 14, fontWeight: '600', color: colors.primary },
-  acceptBtn: {
-    flex: 1, paddingVertical: 11, borderRadius: 12, backgroundColor: colors.primary,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-  },
-  acceptBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
-
-  // Bottom nav
-  bottomNav: {
-    flexDirection: 'row', backgroundColor: '#fff',
-    paddingTop: 10, paddingBottom: 18,
-    borderTopWidth: 1, borderTopColor: colors.border,
-    justifyContent: 'space-around',
-    shadowColor: '#000', shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 8,
-  },
-  navItem: { alignItems: 'center', flex: 1 },
-  navLabel: { fontSize: 10, color: colors.textLight, marginTop: 4, fontWeight: '500' },
-  navLabelActive: { color: colors.primary, fontWeight: '700' },
+  timeText: { fontSize: font.xs + 1, fontWeight: '700', color: colors.primary },
+  price: { fontSize: font.lg, fontWeight: '800', color: colors.accent },
+  infoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginTop: 6 },
+  infoText: { flex: 1, fontSize: font.sm + 1, color: colors.textBody, lineHeight: 20 },
+  actions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg },
 });

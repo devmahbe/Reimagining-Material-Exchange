@@ -4,11 +4,9 @@
     "slug": "bhangari-exchange",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "resizeMode": "contain",
-      "backgroundColor": "#2E7D32"
-    },
+    "backgroundColor": "#F4F6F5",
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -18,14 +16,38 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#2E7D32"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1B6B45"
       },
       "package": "com.doctorstrange.bhangari"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "name": "ভাঙ্গারি এক্সচেঞ্জ",
+      "themeColor": "#1B6B45",
+      "backgroundColor": "#F4F6F5"
     },
     "plugins": [
       "expo-status-bar",
       "expo-web-browser",
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#1B6B45"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "পিকআপের জন্য উপাদানের ছবি বেছে নিতে গ্যালারি ব্যবহার করা হয়।",
+          "cameraPermission": "পিকআপের জন্য উপাদানের ছবি তুলতে ক্যামেরা ব্যবহার করা হয়।"
+        }
+      ]
     ],
     "extra": {
       "eas": {

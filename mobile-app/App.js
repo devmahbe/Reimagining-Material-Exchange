@@ -1,9 +1,14 @@
+import 'react-native-gesture-handler';
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
+import colors from './src/constants/colors';
 
-// Import screens
+// Auth screens
+import SplashScreen from './src/screens/SplashScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import SignupScreen from './src/screens/SignupScreen';
 
@@ -24,7 +29,8 @@ import CollectorStatsScreen from './src/screens/collector/CollectorStatsScreen';
 import EarningsScreen from './src/screens/collector/EarningsScreen';
 
 // Shared screens
-import BKashPaymentScreen from './src/screens/BKashPaymentScreen';
+import PaymentScreen from './src/screens/PaymentScreen';
+import PaymentReceiptScreen from './src/screens/PaymentReceiptScreen';
 import MessagesScreen from './src/screens/MessagesScreen';
 import ChatScreen from './src/screens/ChatScreen';
 import PriceListScreen from './src/screens/PriceListScreen';
@@ -33,46 +39,58 @@ import SettingsScreen from './src/screens/SettingsScreen';
 
 const Stack = createStackNavigator();
 
+const navTheme = {
+  ...DefaultTheme,
+  colors: { ...DefaultTheme.colors, background: colors.background, primary: colors.primary },
+};
+
 export default function App() {
   return (
-    <>
-      <StatusBar style="light" />
-      <NavigationContainer>
-        <Stack.Navigator
-          initialRouteName="Login"
-          screenOptions={{
-            headerShown: false,
-          }}
-        >
-          {/* Auth Screens */}
-          <Stack.Screen name="Login" component={LoginScreen} />
-          <Stack.Screen name="Signup" component={SignupScreen} />
-          
-          {/* Household Screens */}
-          <Stack.Screen name="HouseholdHome" component={HouseholdHomeScreen} />
-          <Stack.Screen name="MaterialSelection" component={MaterialSelectionScreen} />
-          <Stack.Screen name="SchedulePickup" component={SchedulePickupScreen} />
-          <Stack.Screen name="RequestConfirmation" component={RequestConfirmationScreen} />
-          <Stack.Screen name="History" component={HistoryScreen} />
-          <Stack.Screen name="Profile" component={ProfileScreen} />
-          <Stack.Screen name="TrackPickup" component={TrackPickupScreen} />
-          <Stack.Screen name="RateCollector" component={RateCollectorScreen} />
-          
-          {/* Collector Screens */}
-          <Stack.Screen name="CollectorHome" component={CollectorHomeScreen} />
-          <Stack.Screen name="RequestDetails" component={RequestDetailsScreen} />
-          <Stack.Screen name="CollectorStats" component={CollectorStatsScreen} />
-          <Stack.Screen name="Earnings" component={EarningsScreen} />
-          
-          {/* Shared Screens */}
-          <Stack.Screen name="BKashPayment" component={BKashPaymentScreen} />
-          <Stack.Screen name="Messages" component={MessagesScreen} />
-          <Stack.Screen name="ChatScreen" component={ChatScreen} />
-          <Stack.Screen name="PriceList" component={PriceListScreen} />
-          <Stack.Screen name="Notifications" component={NotificationsScreen} />
-          <Stack.Screen name="Settings" component={SettingsScreen} />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <StatusBar style="light" />
+        <NavigationContainer theme={navTheme}>
+          <Stack.Navigator
+            initialRouteName="Splash"
+            screenOptions={{
+              headerShown: false,
+              cardStyle: { backgroundColor: colors.background },
+              cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+              gestureEnabled: true,
+            }}
+          >
+            {/* Auth Screens */}
+            <Stack.Screen name="Splash" component={SplashScreen} options={{ gestureEnabled: false }} />
+            <Stack.Screen name="Login" component={LoginScreen} options={{ gestureEnabled: false }} />
+            <Stack.Screen name="Signup" component={SignupScreen} />
+
+            {/* Household Screens */}
+            <Stack.Screen name="HouseholdHome" component={HouseholdHomeScreen} options={{ gestureEnabled: false }} />
+            <Stack.Screen name="MaterialSelection" component={MaterialSelectionScreen} />
+            <Stack.Screen name="SchedulePickup" component={SchedulePickupScreen} />
+            <Stack.Screen name="RequestConfirmation" component={RequestConfirmationScreen} />
+            <Stack.Screen name="History" component={HistoryScreen} />
+            <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen name="TrackPickup" component={TrackPickupScreen} />
+            <Stack.Screen name="RateCollector" component={RateCollectorScreen} />
+
+            {/* Collector Screens */}
+            <Stack.Screen name="CollectorHome" component={CollectorHomeScreen} options={{ gestureEnabled: false }} />
+            <Stack.Screen name="RequestDetails" component={RequestDetailsScreen} />
+            <Stack.Screen name="CollectorStats" component={CollectorStatsScreen} />
+            <Stack.Screen name="Earnings" component={EarningsScreen} />
+
+            {/* Shared Screens */}
+            <Stack.Screen name="Payment" component={PaymentScreen} />
+            <Stack.Screen name="PaymentReceipt" component={PaymentReceiptScreen} />
+            <Stack.Screen name="Messages" component={MessagesScreen} />
+            <Stack.Screen name="ChatScreen" component={ChatScreen} />
+            <Stack.Screen name="PriceList" component={PriceListScreen} />
+            <Stack.Screen name="Notifications" component={NotificationsScreen} />
+            <Stack.Screen name="Settings" component={SettingsScreen} />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

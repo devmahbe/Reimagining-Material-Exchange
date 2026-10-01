@@ -1,382 +1,189 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  Switch,
-  Alert,
-  Linking,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useEffect, useState } from 'react';
+import { Linking, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth } from '../config/firebase';
+import { Alert } from '../utils/alert';
+import { getCurrentUserProfile, logout } from '../services/userService';
+import { AppHeader, Avatar, Card, SectionHeader } from '../components/ui';
+import AccountSwitcher from '../components/AccountSwitcher';
 import colors from '../constants/colors';
+import { font, radius, spacing } from '../constants/theme';
 
 const SETTINGS_KEY = '@bhangari_settings';
 
+function Row({ icon, iconColor = colors.primary, title, subtitle, onPress, right, last }) {
+  const content = (
+    <View style={[styles.row, last && { borderBottomWidth: 0 }]}>
+      <View style={[styles.rowIcon, { backgroundColor: `${iconColor}1A` }]}>
+        <Ionicons name={icon} size={20} color={iconColor} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.rowTitle}>{title}</Text>
+        {subtitle ? <Text style={styles.rowSubtitle}>{subtitle}</Text> : null}
+      </View>
+      {right !== undefined ? right : onPress ? <Ionicons name="chevron-forward" size={18} color={colors.textLight} /> : null}
+    </View>
+  );
+  return onPress ? <TouchableOpacity onPress={onPress}>{content}</TouchableOpacity> : content;
+}
+
 export default function SettingsScreen({ navigation }) {
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [locationEnabled, setLocationEnabled] = useState(true);
+  const [profile, setProfile] = useState(null);
+  const [settings, setSettings] = useState({ notificationsEnabled: true, soundEnabled: true });
+  const [switcherOpen, setSwitcherOpen] = useState(false);
 
   useEffect(() => {
-    loadSettings();
+    getCurrentUserProfile().then(setProfile).catch(() => {});
+    AsyncStorage.getItem(SETTINGS_KEY)
+      .then((saved) => saved && setSettings((s) => ({ ...s, ...JSON.parse(saved) })))
+      .catch(() => {});
   }, []);
 
-  const loadSettings = async () => {
-    try {
-      const saved = await AsyncStorage.getItem(SETTINGS_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setNotificationsEnabled(parsed.notificationsEnabled ?? true);
-        setSoundEnabled(parsed.soundEnabled ?? true);
-        setLocationEnabled(parsed.locationEnabled ?? true);
-      }
-    } catch (error) {
-      console.log('Error loading settings:', error);
-    }
+  const toggle = (key) => (value) => {
+    const next = { ...settings, [key]: value };
+    setSettings(next);
+    AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next)).catch(() => {});
   };
 
-  const saveSetting = async (key, value) => {
-    try {
-      const saved = await AsyncStorage.getItem(SETTINGS_KEY);
-      const current = saved ? JSON.parse(saved) : {};
-      await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...current, [key]: value }));
-    } catch (error) {
-      console.log('Error saving setting:', error);
-    }
-  };
+  const handleLogout = () =>
+    Alert.alert('লগআউট', 'আপনি কি লগআউট করতে চান?', [
+      { text: 'বাতিল', style: 'cancel' },
+      {
+        text: 'লগআউট',
+        style: 'destructive',
+        onPress: () => logout(navigation).catch(() => Alert.alert('ত্রুটি', 'লগআউট করা যায়নি')),
+      },
+    ]);
 
-  const handleToggle = (key, setter, value) => {
-    setter(value);
-    saveSetting(key, value);
-  };
+  const switchProps = (key) => ({
+    value: settings[key],
+    onValueChange: toggle(key),
+    trackColor: { false: colors.border, true: colors.primaryLight },
+    thumbColor: settings[key] ? colors.primary : '#f4f3f4',
+  });
+
+  const isCollector = profile?.role === 'collector';
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <LinearGradient colors={[colors.primaryDark, colors.primary]} style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={22} color="#fff" />
+    <View style={styles.container}>
+      <AppHeader title="সেটিংস" onBack={() => navigation.goBack()} />
+      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+        <Card style={styles.account} onPress={() => navigation.navigate('Profile')}>
+          <Avatar name={profile?.name} size={54} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.accountName}>{profile?.name || 'ব্যবহারকারী'}</Text>
+            <Text style={styles.accountEmail}>{profile?.email || auth.currentUser?.email}</Text>
+            <Text style={styles.accountRole}>{isCollector ? 'সংগ্রাহক অ্যাকাউন্ট' : 'পরিবার অ্যাকাউন্ট'}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.textLight} />
+        </Card>
+
+        <SectionHeader title="বিজ্ঞপ্তি" />
+        <Card style={styles.group}>
+          <Row icon="notifications-outline" title="অ্যাপের বিজ্ঞপ্তি" subtitle="পিকআপ আপডেট দেখান" right={<Switch {...switchProps('notificationsEnabled')} />} />
+          <Row icon="volume-medium-outline" title="বিজ্ঞপ্তি সাউন্ড" subtitle="নতুন বার্তায় শব্দ" right={<Switch {...switchProps('soundEnabled')} />} last />
+        </Card>
+
+        <SectionHeader title="অ্যাকাউন্ট" />
+        <Card style={styles.group}>
+          <Row
+            icon="swap-horizontal-outline"
+            title="অ্যাকাউন্ট পরিবর্তন / যোগ করুন"
+            subtitle="একই ডিভাইসে একাধিক অ্যাকাউন্ট"
+            onPress={() => setSwitcherOpen(true)}
+          />
+          <Row icon="person-outline" title="প্রোফাইল সম্পাদনা" subtitle="নাম, ফোন, ঠিকানা" onPress={() => navigation.navigate('Profile')} />
+          {isCollector ? (
+            <Row icon="wallet-outline" title="পেমেন্ট ও লেনদেন" subtitle="নগদ, মোবাইল ওয়ালেট, ব্যাংক (ডেমো)" onPress={() => navigation.navigate('Earnings')} />
+          ) : (
+            <Row icon="time-outline" title="পিকআপ ইতিহাস" subtitle="সব অনুরোধ ও পেমেন্ট" onPress={() => navigation.navigate('History')} />
+          )}
+          <Row icon="pricetags-outline" title="আজকের দর" onPress={() => navigation.navigate('PriceList')} last />
+        </Card>
+
+        <SectionHeader title="সহায়তা" />
+        <Card style={styles.group}>
+          <Row
+            icon="help-circle-outline"
+            iconColor={colors.info}
+            title="সাহায্য কেন্দ্র"
+            subtitle="সাধারণ প্রশ্ন"
+            onPress={() =>
+              Alert.alert(
+                'সাধারণ প্রশ্নাবলী',
+                '• পিকআপ কীভাবে দেব: হোম স্ক্রিনে "পিকআপের অনুরোধ করুন" চাপুন\n\n• দাম কীভাবে ঠিক হয়: সংগ্রাহক পিকআপের সময় ওজন করে দাম ঠিক করেন\n\n• পেমেন্ট কীভাবে পাব: পিকআপ শেষে সংগ্রাহক নগদ, মোবাইল ওয়ালেট বা ব্যাংকে পরিশোধ করবেন, রসিদ অ্যাপে পাবেন'
+              )
+            }
+          />
+          <Row
+            icon="call-outline"
+            iconColor={colors.info}
+            title="আমাদের সাথে যোগাযোগ"
+            subtitle="support@bhangari.com • 01700-000000"
+            onPress={() => Linking.openURL('mailto:support@bhangari.com').catch(() => {})}
+          />
+          <Row
+            icon="document-text-outline"
+            iconColor={colors.textGray}
+            title="শর্তাবলী ও গোপনীয়তা"
+            onPress={() =>
+              Alert.alert(
+                'শর্তাবলী ও গোপনীয়তা',
+                'ভাঙ্গারি এক্সচেঞ্জ ব্যবহার করে আপনি সঠিক তথ্য দিতে সম্মত হচ্ছেন। আপনার ফোন নম্বর ও ঠিকানা শুধুমাত্র আপনার পিকআপ গ্রহণকারী সংগ্রাহকের সাথে শেয়ার হয় এবং তৃতীয় পক্ষকে দেওয়া হয় না।'
+              )
+            }
+            last
+          />
+        </Card>
+
+        <SectionHeader title="সম্পর্কে" />
+        <Card style={styles.group}>
+          <Row icon="information-circle-outline" iconColor={colors.textGray} title="অ্যাপ ভার্সন" subtitle="v১.০.০" right={null} />
+          <Row icon="people-outline" iconColor={colors.textGray} title="ডেভেলপার" subtitle="Team: Doctor Strange, Section B" right={null} last />
+        </Card>
+
+        <TouchableOpacity style={styles.logout} onPress={handleLogout}>
+          <Ionicons name="log-out-outline" size={20} color={colors.error} />
+          <Text style={styles.logoutText}>লগআউট</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>সেটিংস</Text>
-        <View style={{ width: 40 }} />
-      </LinearGradient>
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Notifications Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>বিজ্ঞপ্তি</Text>
-          
-          <View style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <Ionicons name="notifications-outline" size={22} color={colors.primary} style={styles.settingIcon} />
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingTitle}>পুশ বিজ্ঞপ্তি</Text>
-                <Text style={styles.settingSubtitle}>অনুরোধ আপডেট পান</Text>
-              </View>
-            </View>
-            <Switch
-              value={notificationsEnabled}
-              onValueChange={(v) => handleToggle('notificationsEnabled', setNotificationsEnabled, v)}
-              trackColor={{ false: colors.border, true: colors.primaryLight }}
-              thumbColor={notificationsEnabled ? colors.primary : '#f4f3f4'}
-            />
-          </View>
-
-          <View style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <Ionicons name="volume-medium-outline" size={22} color={colors.primary} style={styles.settingIcon} />
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingTitle}>বিজ্ঞপ্তি সাউন্ড</Text>
-                <Text style={styles.settingSubtitle}>নতুন বার্তায় শব্দ</Text>
-              </View>
-            </View>
-            <Switch
-              value={soundEnabled}
-              onValueChange={(v) => handleToggle('soundEnabled', setSoundEnabled, v)}
-              trackColor={{ false: colors.border, true: colors.primaryLight }}
-              thumbColor={soundEnabled ? colors.primary : '#f4f3f4'}
-            />
-          </View>
-        </View>
-
-        {/* Account Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>অ্যাকাউন্ট</Text>
-          
-          <TouchableOpacity
-            style={styles.settingItem}
-            onPress={() => navigation.navigate('Profile')}
-          >
-            <View style={styles.settingLeft}>
-              <Ionicons name="person-outline" size={22} color={colors.primary} style={styles.settingIcon} />
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingTitle}>প্রোফাইল সম্পাদনা</Text>
-                <Text style={styles.settingSubtitle}>নাম, ঠিকানা, ফোন</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.settingItem}
-            onPress={() => Alert.alert('পাসওয়ার্ড পরিবর্তন', 'প্রোফাইল স্ক্রিনে গিয়ে পাসওয়ার্ড পরিবর্তন করুন।')}
-          >
-            <View style={styles.settingLeft}>
-              <Ionicons name="lock-closed-outline" size={22} color={colors.primary} style={styles.settingIcon} />
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingTitle}>পাসওয়ার্ড পরিবর্তন</Text>
-                <Text style={styles.settingSubtitle}>নিরাপত্তা আপডেট</Text>
-              </View>
-            </View>
-            <Text style={styles.arrow}>→</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.settingItem}
-            onPress={() => Alert.alert('পেমেন্ট পদ্ধতি', 'আয় স্ক্রিন থেকে bKash উত্তোলন করতে পারবেন।')}
-          >
-            <View style={styles.settingLeft}>
-              <Ionicons name="card-outline" size={22} color={colors.primary} style={styles.settingIcon} />
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingTitle}>পেমেন্ট পদ্ধতি</Text>
-                <Text style={styles.settingSubtitle}>bKash, Rocket যোগ করুন</Text>
-              </View>
-            </View>
-            <Text style={styles.arrow}>→</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* App Preferences */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>অ্যাপ পছন্দ</Text>
-          
-          <TouchableOpacity style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <Ionicons name="globe-outline" size={22} color={colors.primary} style={styles.settingIcon} />
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingTitle}>ভাষা</Text>
-                <Text style={styles.settingSubtitle}>বাংলা</Text>
-              </View>
-            </View>
-            <Text style={styles.arrow}>→</Text>
-          </TouchableOpacity>
-
-          <View style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <Ionicons name="location-outline" size={22} color={colors.primary} style={styles.settingIcon} />
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingTitle}>লোকেশন অ্যাক্সেস</Text>
-                <Text style={styles.settingSubtitle}>নিকটবর্তী সংগ্রাহক খুঁজুন</Text>
-              </View>
-            </View>
-            <Switch
-              value={locationEnabled}
-              onValueChange={(v) => handleToggle('locationEnabled', setLocationEnabled, v)}
-              trackColor={{ false: colors.border, true: colors.primaryLight }}
-              thumbColor={locationEnabled ? colors.primary : '#f4f3f4'}
-            />
-          </View>
-
-          <TouchableOpacity style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <Ionicons name="color-palette-outline" size={22} color={colors.primary} style={styles.settingIcon} />
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingTitle}>থিম</Text>
-                <Text style={styles.settingSubtitle}>লাইট মোড</Text>
-              </View>
-            </View>
-            <Text style={styles.arrow}>→</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Support Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>সহায়তা</Text>
-          
-          <TouchableOpacity
-            style={styles.settingItem}
-            onPress={() => Alert.alert('সাহায্য কেন্দ্র', '📌 সাধারণ প্রশ্নাবলী:\n\n• পিকআপ কীভাবে দিতে হয়: হোম স্ক্রিন থেকে "পিকআপ দিন" বাটন চাপুন\n• দাম কীভাবে ঠিক হয়: পিকআপের সময় সংগ্রাহক মূল্যায়ন করে দাম নির্ধারণ করেন\n• পেমেন্ট কীভাবে পাবো: সম্পন্ন পিকআপের পর bKash-এ পেমেন্ট পাবেন\n\nআরো সাহায্যের জন্য সাপোর্টে যোগাযোগ করুন।')}
-          >
-            <View style={styles.settingLeft}>
-              <Ionicons name="help-circle-outline" size={22} color="#3B82F6" style={styles.settingIcon} />
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingTitle}>সাহায্য কেন্দ্র</Text>
-                <Text style={styles.settingSubtitle}>FAQ এবং গাইড</Text>
-              </View>
-            </View>
-            <Text style={styles.arrow}>→</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.settingItem}
-            onPress={() => Alert.alert('যোগাযোগ', 'ইমেইল: support@bhangari.com\nফোন: 01700-000000\nসময়: সকাল ৯টা - রাত ৯টা')}
-          >
-            <View style={styles.settingLeft}>
-              <Ionicons name="chatbubble-outline" size={22} color="#3B82F6" style={styles.settingIcon} />
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingTitle}>আমাদের সাথে যোগাযোগ</Text>
-                <Text style={styles.settingSubtitle}>সাপোর্ট টিম</Text>
-              </View>
-            </View>
-            <Text style={styles.arrow}>→</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.settingItem}
-            onPress={() => Linking.openURL('https://play.google.com/store')}
-          >
-            <View style={styles.settingLeft}>
-              <Ionicons name="star-outline" size={22} color={colors.accent} style={styles.settingIcon} />
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingTitle}>অ্যাপ রেটিং দিন</Text>
-                <Text style={styles.settingSubtitle}>Play Store এ রিভিউ</Text>
-              </View>
-            </View>
-            <Text style={styles.arrow}>→</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Legal Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>আইনি</Text>
-          
-          <TouchableOpacity
-            style={styles.settingItem}
-            onPress={() => Alert.alert('শর্তাবলী', 'ভাঙ্গারি এক্সচেঞ্জ ব্যবহার করে আপনি:\n\n• সঠিক তথ্য দিতে সম্মত হচ্ছেন\n• প্ল্যাটফর্মের নীতি মেনে চলতে সম্মত হচ্ছেন\n• মিথ্যা তথ্য দিলে অ্যাকাউন্ট বন্ধ হতে পারে')}
-          >
-            <View style={styles.settingLeft}>
-              <Ionicons name="document-text-outline" size={22} color={colors.textGray} style={styles.settingIcon} />
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingTitle}>শর্তাবলী</Text>
-              </View>
-            </View>
-            <Text style={styles.arrow}>→</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.settingItem}
-            onPress={() => Alert.alert('গোপনীয়তা নীতি', 'আমরা আপনার ব্যক্তিগত তথ্য সুরক্ষিত রাখি। আপনার তথ্য তৃতীয় পক্ষের সাথে শেয়ার করা হয় না। তথ্য শুধু সার্ভিস প্রদানের জন্য ব্যবহৃত হয়।')}
-          >
-            <View style={styles.settingLeft}>
-              <Ionicons name="shield-checkmark-outline" size={22} color={colors.textGray} style={styles.settingIcon} />
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingTitle}>গোপনীয়তা নীতি</Text>
-              </View>
-            </View>
-            <Text style={styles.arrow}>→</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* About Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>সম্পর্কে</Text>
-          
-          <View style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <Ionicons name="information-circle-outline" size={22} color={colors.textGray} style={styles.settingIcon} />
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingTitle}>অ্যাপ ভার্সন</Text>
-                <Text style={styles.settingSubtitle}>v1.0.0</Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <Ionicons name="people-outline" size={22} color={colors.textGray} style={styles.settingIcon} />
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingTitle}>ডেভেলপার</Text>
-                <Text style={styles.settingSubtitle}>Team: Doctor Strange, Section B</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        <View style={{ height: 20 }} />
       </ScrollView>
-    </SafeAreaView>
+      <AccountSwitcher visible={switcherOpen} onClose={() => setSwitcherOpen(false)} navigation={navigation} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgCream,
-  },
-  header: {
+  container: { flex: 1, backgroundColor: colors.background },
+  body: { padding: spacing.lg, paddingBottom: spacing.xxxl },
+  account: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  accountName: { fontSize: font.lg, fontWeight: '700', color: colors.text },
+  accountEmail: { fontSize: font.sm, color: colors.textGray, marginTop: 1 },
+  accountRole: { fontSize: font.xs + 1, color: colors.primary, fontWeight: '700', marginTop: 3 },
+  group: { paddingVertical: spacing.xs, paddingHorizontal: spacing.md },
+  row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-  },
-  backBtn: {
-    width: 36, height: 36, borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: 'white',
-  },
-  content: {
-    flex: 1,
-  },
-  section: {
-    marginTop: 20,
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.textGray,
-    textTransform: 'uppercase',
-    marginBottom: 10,
-    marginHorizontal: 20,
-    letterSpacing: 0.5,
-  },
-  settingItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
+    gap: spacing.md,
+    minHeight: 60,
+    paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.borderLight,
   },
-  settingLeft: {
+  rowIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  rowTitle: { fontSize: font.md, fontWeight: '600', color: colors.text },
+  rowSubtitle: { fontSize: font.sm - 1, color: colors.textGray, marginTop: 2 },
+  logout: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
+    justifyContent: 'center',
+    gap: spacing.sm,
+    minHeight: 52,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.error,
+    backgroundColor: colors.white,
+    marginTop: spacing.xxl,
   },
-  settingIcon: {
-    marginRight: 14,
-    width: 26,
-    textAlign: 'center',
-  },
-  settingTextContainer: {
-    flex: 1,
-  },
-  settingTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.textDark,
-    marginBottom: 2,
-  },
-  settingSubtitle: {
-    fontSize: 12,
-    color: colors.textGray,
-  },
-  arrow: {
-    color: colors.textLight,
-    marginLeft: 4,
-  },
+  logoutText: { color: colors.error, fontWeight: '700', fontSize: font.md },
 });
-

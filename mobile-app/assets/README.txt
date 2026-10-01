@@ -1,24 +1,9 @@
-# 📝 IMPORTANT: README FIRST
+App image assets (referenced from app.json)
 
-## You created placeholder assets but Expo needs real images
+- icon.png          1024x1024 app icon (iOS + fallback)
+- adaptive-icon.png 1024x1024 transparent foreground for the Android adaptive icon
+                    (background colour #1B6B45 is set in app.json)
+- splash-icon.png   Logo shown on the splash screen (background #1B6B45, set in app.json)
+- favicon.png       Browser tab icon for the web build
 
-Create a folder called `assets` in the `mobile-app` directory and add:
-
-### Option 1: Quick Setup (Use placeholder)
-Create simple placeholder images:
-
-1. Create `mobile-app/assets/` folder
-2. Download any icon (512x512 px) and save as:
-   - `icon.png` 
-   - `splash.png`
-   - `adaptive-icon.png`
-   - `favicon.png`
-
-### Option 2: Skip for now
-The app will work without these for development.
-Images are only needed when building APK/IPA files.
-
-## For development testing:
-Just ignore the asset warnings and proceed!
-
-The app will still work in Expo Go without these images.
+To use your own artwork, replace these files with images of the same size and name.

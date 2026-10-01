@@ -1,43 +1,153 @@
 rules_version = '2';
 
 // Firestore security rules for Bhangari Exchange.
-// Users may only read/write their OWN documents; pickup requests are readable
-// by any authenticated user (so collectors can discover pending requests) and
-// updateable by participants (household owns it, or collector who accepted it).
+//
+//  users           – any signed-in user can read profiles (names shown in chat,
+//                    tracking); you can only create/edit your own, and your role
+//                    can't be changed after sign-up.
+//  pickupRequests  – households see their own requests, collectors see pending
+//                    requests plus the ones they accepted. Every status change is
+//                    restricted to the person allowed to make it.
+//  messages        – only the sender and recipient can read a message.
+//  reviews         – one review per completed pickup, written by its household.
+//  payments        – demo payments, written by the assigned collector and
+//                    readable by the payer and payee only.
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users collection
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    function isCollector() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(uid()))
+        && get(/databases/$(database)/documents/users/$(uid())).data.role == 'collector';
+    }
+
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    function pickup(requestId) {
+      return get(/databases/$(database)/documents/pickupRequests/$(requestId)).data;
+    }
+
+    // ─── Users ────────────────────────────────────────────────────────────
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow create, update, delete: if request.auth != null && request.auth.uid == userId;
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && uid() == userId
+        && request.resource.data.role in ['household', 'collector'];
+      allow update: if signedIn()
+        && uid() == userId
+        && request.resource.data.get('role', null) == resource.data.get('role', null);
+      allow delete: if signedIn() && uid() == userId;
     }
 
-    // Pickup requests
+    // ─── Pickup requests ──────────────────────────────────────────────────
     match /pickupRequests/{requestId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null
-        && (request.resource.data.userId == request.auth.uid
-            || resource.data.userId == request.auth.uid
-            || resource.data.collectorId == request.auth.uid);
+      allow read: if signedIn() && (
+        resource.data.userId == uid()
+        || (resource.data.status == 'pending' && isCollector())
+        || resource.data.collectorId == uid()
+      );
+
+      allow create: if signedIn()
+        && request.resource.data.userId == uid()
+        && request.resource.data.status == 'pending'
+        && !('collectorId' in request.resource.data);
+
+      allow update: if signedIn()
+        && request.resource.data.userId == resource.data.userId
+        && (
+          // Household cancels before the pickup is done
+          (resource.data.userId == uid()
+            && resource.data.status in ['pending', 'accepted']
+            && request.resource.data.status == 'cancelled'
+            && changedKeys().hasOnly(['status', 'cancelledAt', 'cancelledBy']))
+
+          // Household rates a completed pickup
+          || (resource.data.userId == uid()
+            && resource.data.status == 'completed'
+            && changedKeys().hasOnly(['userRating', 'userReview', 'ratingTags', 'ratedAt']))
+
+          // A collector accepts a pending pickup
+          || (isCollector()
+            && resource.data.status == 'pending'
+            && request.resource.data.status == 'accepted'
+            && request.resource.data.collectorId == uid()
+            && changedKeys().hasOnly(['status', 'collectorId', 'collectorName', 'collectorPhone', 'acceptedAt']))
+
+          // The assigned collector moves the pickup forward and completes it with a payment
+          || (resource.data.collectorId == uid()
+            && request.resource.data.collectorId == uid()
+            && resource.data.status in ['accepted', 'on-the-way', 'at-location', 'in-progress']
+            && request.resource.data.status in ['accepted', 'on-the-way', 'at-location', 'completed']
+            && changedKeys().hasOnly(['status', 'onTheWayAt', 'atLocationAt', 'completedAt',
+                                      'actualEarnings', 'paymentStatus', 'paymentMethod', 'paymentId', 'paidAt']))
+        );
+
+      allow delete: if false;
     }
 
-    // Messages
+    // ─── Messages ─────────────────────────────────────────────────────────
     match /messages/{messageId} {
-      allow read: if request.auth != null
-        && (resource.data.senderId == request.auth.uid
-            || resource.data.recipientId == request.auth.uid);
-      allow create: if request.auth != null
-        && request.data.senderId == request.auth.uid;
+      allow read: if signedIn()
+        && (resource.data.senderId == uid() || resource.data.recipientId == uid());
+
+      allow create: if signedIn()
+        && request.resource.data.senderId == uid()
+        && request.resource.data.recipientId is string
+        && request.resource.data.recipientId != uid()
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 1000;
+
+      // Only the recipient can mark a message as read
+      allow update: if signedIn()
+        && resource.data.recipientId == uid()
+        && changedKeys().hasOnly(['read']);
+
+      allow delete: if false;
     }
 
-    // Reviews
+    // ─── Reviews ──────────────────────────────────────────────────────────
     match /reviews/{reviewId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null
-        && request.data.userId == request.auth.uid;
+      allow read: if signedIn();
+
+      // Document id == pickup id, so each pickup can be reviewed only once
+      allow create: if signedIn()
+        && request.resource.data.userId == uid()
+        && request.resource.data.requestId == reviewId
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 5
+        && pickup(reviewId).userId == uid()
+        && pickup(reviewId).status == 'completed'
+        && pickup(reviewId).collectorId == request.resource.data.collectorId;
+
+      allow update, delete: if false;
+    }
+
+    // ─── Payments (demo) ──────────────────────────────────────────────────
+    match /payments/{paymentId} {
+      allow read: if signedIn()
+        && (resource.data.payerId == uid() || resource.data.payeeId == uid());
+
+      allow create: if signedIn()
+        && request.resource.data.payerId == uid()
+        && request.resource.data.amount is number
+        && request.resource.data.amount > 0
+        && pickup(request.resource.data.requestId).collectorId == uid()
+        && pickup(request.resource.data.requestId).userId == request.resource.data.payeeId;
+
+      allow update, delete: if false;
     }
   }
 }

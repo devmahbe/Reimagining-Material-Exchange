@@ -1,431 +1,220 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  TextInput,
-  Alert,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useCallback, useState } from 'react';
+import { FlatList, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { collection, query, where, getDocs, orderBy, doc, getDoc } from 'firebase/firestore';
-import { db, auth } from '../config/firebase';
+import { useFocusEffect } from '@react-navigation/native';
+import { auth } from '../config/firebase';
+import { getConversations } from '../services/chatService';
+import { getUserProfile } from '../services/userService';
+import { navItemsForRole } from '../navigation/navItems';
+import { AppHeader, Avatar, BottomNav, Chip, EmptyState, LoadingView } from '../components/ui';
+import { getTimeAgo, toBnDigits } from '../utils/helpers';
 import colors from '../constants/colors';
+import { font, radius, spacing } from '../constants/theme';
+
+const FILTERS = [
+  { key: 'all', label: 'সব' },
+  { key: 'unread', label: 'অপঠিত' },
+  { key: 'household', label: 'পরিবার' },
+  { key: 'collector', label: 'সংগ্রাহক' },
+];
 
 export default function MessagesScreen({ navigation }) {
+  const [role, setRole] = useState(null);
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('all');
 
-  
-  const [searchQuery, setSearchQuery] = useState('');
-
-  useEffect(() => {
-    loadConversations();
-  }, []);
-
-  const loadConversations = async () => {
+  const load = useCallback(async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
     try {
-      const user = auth.currentUser;
-      if (!user) return;
-
-      // Fetch messages sent by and received by the current user
-      const [sentSnap, receivedSnap] = await Promise.all([
-        getDocs(query(
-          collection(db, 'messages'),
-          where('senderId', '==', user.uid),
-          orderBy('createdAt', 'desc')
-        )),
-        getDocs(query(
-          collection(db, 'messages'),
-          where('recipientId', '==', user.uid),
-          orderBy('createdAt', 'desc')
-        )),
-      ]);
-
-      // Build map: conversationId → { otherUserId, lastMessage, lastMessageTime }
-      const convMap = new Map();
-      const processSnap = (snapshot) => {
-        snapshot.forEach((d) => {
-          const msg = { id: d.id, ...d.data() };
-          const otherUserId = msg.senderId === user.uid ? msg.recipientId : msg.senderId;
-          const existing = convMap.get(msg.conversationId);
-          if (!existing || msg.createdAt > existing.lastMessageTime) {
-            convMap.set(msg.conversationId, {
-              conversationId: msg.conversationId,
-              otherUserId,
-              lastMessage: msg.text,
-              lastMessageTime: msg.createdAt,
-            });
-          }
-        });
-      };
-      processSnap(sentSnap);
-      processSnap(receivedSnap);
-
-      // Count unread messages per conversation
-      const unreadSnap = await getDocs(query(
-        collection(db, 'messages'),
-        where('recipientId', '==', user.uid),
-        where('read', '==', false)
-      ));
-      const unreadCounts = {};
-      unreadSnap.forEach((d) => {
-        const cid = d.data().conversationId;
-        unreadCounts[cid] = (unreadCounts[cid] || 0) + 1;
-      });
-
-      // Resolve other user's name and role
-      const conversations = await Promise.all(
-        Array.from(convMap.values()).map(async (conv) => {
-          try {
-            const userDoc = await getDoc(doc(db, 'users', conv.otherUserId));
-            const userData = userDoc.exists() ? userDoc.data() : {};
-            return {
-              id: conv.conversationId,
-              otherUserId: conv.otherUserId,
-              name: userData.name || 'অজানা ব্যবহারকারী',
-              lastMessage: conv.lastMessage,
-              timestamp: new Date(conv.lastMessageTime),
-              unreadCount: unreadCounts[conv.conversationId] || 0,
-              userType: userData.role || 'unknown',
-              avatar: userData.role === 'collector' ? '👷' : '🏠',
-            };
-          } catch {
-            return null;
-          }
+      setError(false);
+      const [me, convs] = await Promise.all([getUserProfile(uid).catch(() => null), getConversations(uid)]);
+      setRole(me?.role || null);
+      // Resolve the other person's name and role
+      const withUsers = await Promise.all(
+        convs.map(async (c) => {
+          const other = await getUserProfile(c.otherUserId).catch(() => null);
+          return { ...c, name: other?.name || 'অজানা ব্যবহারকারী', userRole: other?.role || 'unknown' };
         })
       );
-
-      const sorted = conversations
-        .filter(Boolean)
-        .sort((a, b) => b.timestamp - a.timestamp);
-
-      setConversations(sorted);
-    } catch (error) {
-      console.log('Error loading conversations:', error);
+      setConversations(withUsers);
+    } catch (e) {
+      setError(true);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const formatTimestamp = (timestamp) => {
-    const now = new Date();
-    const diff = now - timestamp;
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (minutes < 1) return 'এখন';
-    if (minutes < 60) return `${minutes} মিনিট আগে`;
-    if (hours < 24) return `${hours} ঘন্টা আগে`;
-    if (days === 1) return 'গতকাল';
-    return `${days} দিন আগে`;
-  };
-
-  const filteredConversations = conversations.filter(conv =>
-    conv.name.toLowerCase().includes(searchQuery.toLowerCase())
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
   );
 
-  return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <LinearGradient colors={[colors.primaryDark, colors.primary]} style={styles.header}>
-        <View style={styles.headerTop}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={22} color="#fff" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>বার্তা</Text>
-          <TouchableOpacity
-            style={styles.backBtn}
-            onPress={() => Alert.alert('নতুন বার্তা', 'পিকআপ অনুরোধ গ্রহণ করার পর সংগ্রাহক বা গৃহস্থালির সাথে বার্তা চালু হয়।')}
-          >
-            <Ionicons name="create-outline" size={22} color="#fff" />
-          </TouchableOpacity>
-        </View>
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  };
 
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
+  const term = search.trim().toLowerCase();
+  const visible = conversations.filter((c) => {
+    if (term && !c.name.toLowerCase().includes(term) && !(c.lastMessage || '').toLowerCase().includes(term)) return false;
+    if (filter === 'unread') return c.unreadCount > 0;
+    if (filter === 'household' || filter === 'collector') return c.userRole === filter;
+    return true;
+  });
+  const unreadTotal = conversations.reduce((s, c) => s + c.unreadCount, 0);
+
+  const renderItem = ({ item }) => {
+    const unread = item.unreadCount > 0;
+    return (
+      <TouchableOpacity
+        style={styles.row}
+        onPress={() => navigation.navigate('ChatScreen', { recipientId: item.otherUserId, recipientName: item.name })}
+      >
+        <View>
+          <Avatar name={item.name} size={50} bg={item.userRole === 'collector' ? colors.accentSoft : colors.primarySoft} color={item.userRole === 'collector' ? colors.accent : colors.primary} />
+          <View style={styles.roleDot}>
+            <Ionicons name={item.userRole === 'collector' ? 'bicycle' : 'home'} size={10} color={colors.white} />
+          </View>
+        </View>
+        <View style={{ flex: 1 }}>
+          <View style={styles.rowHead}>
+            <Text style={[styles.name, unread && styles.bold]} numberOfLines={1}>{item.name}</Text>
+            <Text style={[styles.time, unread && { color: colors.primary }]}>{getTimeAgo(item.time)}</Text>
+          </View>
+          <View style={styles.rowHead}>
+            <Text style={[styles.preview, unread && styles.previewUnread]} numberOfLines={1}>
+              {item.lastFromMe ? 'আপনি: ' : ''}{item.lastMessage}
+            </Text>
+            {unread ? (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadText}>{toBnDigits(item.unreadCount)}</Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      <AppHeader
+        title="বার্তা"
+        subtitle={unreadTotal ? `${toBnDigits(unreadTotal)}টি অপঠিত বার্তা` : 'আপনার সব কথোপকথন'}
+        onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined}
+      >
+        <View style={styles.search}>
+          <Ionicons name="search" size={18} color={colors.textGray} />
           <TextInput
             style={styles.searchInput}
-            placeholder="খুঁজুন..."
+            placeholder="নাম বা বার্তা খুঁজুন..."
             placeholderTextColor={colors.textLight}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
+            value={search}
+            onChangeText={setSearch}
           />
-        </View>
-      </LinearGradient>
-
-      {/* Conversations List */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {filteredConversations.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>💬</Text>
-            <Text style={styles.emptyText}>কোন বার্তা নেই</Text>
-            <Text style={styles.emptySubtext}>
-              {searchQuery ? 'কোন ফলাফল পাওয়া যায়নি' : 'নতুন বার্তা শুরু করুন'}
-            </Text>
-          </View>
-        ) : (
-          filteredConversations.map((conversation) => (
-            <TouchableOpacity
-              key={conversation.id}
-              style={styles.conversationCard}
-              onPress={() => navigation.navigate('ChatScreen', {
-                recipientId: conversation.otherUserId,
-                recipientName: conversation.name,
-              })}
-            >
-              <View style={styles.avatarContainer}>
-                <Text style={styles.avatar}>{conversation.avatar}</Text>
-                {conversation.unreadCount > 0 && (
-                  <View style={styles.onlineBadge} />
-                )}
-              </View>
-
-              <View style={styles.conversationContent}>
-                <View style={styles.conversationHeader}>
-                  <Text style={styles.conversationName}>{conversation.name}</Text>
-                  <Text style={styles.timestamp}>
-                    {formatTimestamp(conversation.timestamp)}
-                  </Text>
-                </View>
-
-                <View style={styles.messagePreview}>
-                  <Text
-                    style={[
-                      styles.lastMessage,
-                      conversation.unreadCount > 0 && styles.unreadMessage
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {conversation.lastMessage}
-                  </Text>
-                  {conversation.unreadCount > 0 && (
-                    <View style={styles.unreadBadge}>
-                      <Text style={styles.unreadCount}>{conversation.unreadCount}</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
+          {search ? (
+            <TouchableOpacity onPress={() => setSearch('')} hitSlop={8}>
+              <Ionicons name="close-circle" size={18} color={colors.textLight} />
             </TouchableOpacity>
-          ))
-        )}
+          ) : null}
+        </View>
+      </AppHeader>
 
-        <View style={{ height: 20 }} />
-      </ScrollView>
+      {loading ? (
+        <LoadingView />
+      ) : (
+        <FlatList
+          data={visible}
+          keyExtractor={(item) => item.conversationId}
+          renderItem={renderItem}
+          ListHeaderComponent={
+            <View style={styles.filters}>
+              {FILTERS.map((f) => (
+                <Chip key={f.key} label={f.label} active={filter === f.key} onPress={() => setFilter(f.key)} />
+              ))}
+            </View>
+          }
+          contentContainerStyle={styles.list}
+          ItemSeparatorComponent={() => <View style={styles.sep} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
+          ListEmptyComponent={
+            error ? (
+              <EmptyState icon="cloud-offline-outline" title="বার্তা লোড করা যায়নি" message="ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন" actionLabel="আবার চেষ্টা" onAction={load} />
+            ) : (
+              <EmptyState
+                icon="chatbubbles-outline"
+                title={search || filter !== 'all' ? 'কিছু পাওয়া যায়নি' : 'কোনো বার্তা নেই'}
+                message="পিকআপ গ্রহণ হলে পরিবার ও সংগ্রাহক একে অপরকে বার্তা পাঠাতে পারবেন"
+              />
+            )
+          }
+        />
+      )}
 
-      {/* Quick Actions */}
-      <View style={styles.quickActions}>
-        <TouchableOpacity
-          style={styles.quickActionButton}
-          onPress={() => {
-            const householdConvs = conversations.filter(c => c.userType === 'household');
-            if (householdConvs.length === 0)
-              Alert.alert('পরিবার', 'কোন পরিবারের সাথে কথোপকথন নেই। পিকআপ অনুরোধ গ্রহণ করলে যোগাযোগ শুরু হবে।');
-          }}
-        >
-          <Ionicons name="home-outline" size={26} color={colors.primary} style={{ marginBottom: 4 }} />
-          <Text style={styles.quickActionLabel}>পরিবার</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.quickActionButton}
-          onPress={() => {
-            const collectorConvs = conversations.filter(c => c.userType === 'collector');
-            if (collectorConvs.length === 0)
-              Alert.alert('সংগ্রাহক', 'কোন সংগ্রাহকের সাথে কথোপকথন নেই।');
-          }}
-        >
-          <Ionicons name="construct-outline" size={26} color={colors.primary} style={{ marginBottom: 4 }} />
-          <Text style={styles.quickActionLabel}>সংগ্রাহক</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.quickActionButton}
-          onPress={() => Alert.alert('সাপোর্ট', 'ইমেইল: support@bhangari.com\nফোন: 01700-000000\nসময়: সকাল ৯টা – রাত ৯টা')}
-        >
-          <Ionicons name="help-circle-outline" size={26} color="#3B82F6" style={{ marginBottom: 4 }} />
-          <Text style={styles.quickActionLabel}>সাপোর্ট</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+      {role ? <BottomNav items={navItemsForRole(role, navigation, unreadTotal)} active="messages" /> : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgCream,
-  },
-  header: {
-    paddingTop: 10,
-    paddingBottom: 15,
-    paddingHorizontal: 20,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  backBtn: {
-    width: 36, height: 36, borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: 'white',
-  },
-  headerIcon: {
-    fontSize: 22,
-  },
-  searchContainer: {
+  container: { flex: 1, backgroundColor: colors.background },
+  search: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 12,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+    gap: spacing.sm,
+    backgroundColor: colors.white,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    minHeight: 46,
+    marginTop: spacing.lg,
   },
-  searchIcon: {
-    fontSize: 18,
-    marginRight: 10,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: 'white',
-  },
-  content: {
-    flex: 1,
-  },
-  conversationCard: {
+  searchInput: { flex: 1, fontSize: font.md, color: colors.text, paddingVertical: spacing.sm },
+  filters: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
+  list: { padding: spacing.lg, flexGrow: 1 },
+  row: {
     flexDirection: 'row',
-    backgroundColor: 'white',
-    marginHorizontal: 15,
-    marginTop: 15,
-    padding: 15,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.white,
+    padding: spacing.md,
+    borderRadius: radius.lg,
   },
-  avatarContainer: {
-    position: 'relative',
-    marginRight: 12,
-  },
-  avatar: {
-    fontSize: 40,
-    width: 55,
-    height: 55,
-    backgroundColor: colors.bgCream,
-    borderRadius: 28,
-    textAlign: 'center',
-    lineHeight: 55,
-  },
-  onlineBadge: {
+  sep: { height: spacing.sm },
+  roleDot: {
     position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 14,
-    height: 14,
-    backgroundColor: '#4CAF50',
-    borderRadius: 7,
-    borderWidth: 2,
-    borderColor: 'white',
-  },
-  conversationContent: {
-    flex: 1,
-  },
-  conversationHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  conversationName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.textDark,
-  },
-  timestamp: {
-    fontSize: 12,
-    color: colors.textLight,
-  },
-  messagePreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  lastMessage: {
-    flex: 1,
-    fontSize: 14,
-    color: colors.textGray,
-  },
-  unreadMessage: {
-    fontWeight: '600',
-    color: colors.textDark,
-  },
-  unreadBadge: {
+    right: -2,
+    bottom: -2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: colors.primary,
-    borderRadius: 12,
-    minWidth: 24,
-    height: 24,
+    borderWidth: 2,
+    borderColor: colors.white,
+    alignItems: 'center',
     justifyContent: 'center',
+  },
+  rowHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  name: { flex: 1, fontSize: font.md + 1, fontWeight: '600', color: colors.text },
+  bold: { fontWeight: '800' },
+  time: { fontSize: font.xs + 1, color: colors.textLight },
+  preview: { flex: 1, fontSize: font.sm + 1, color: colors.textGray, marginTop: 3 },
+  previewUnread: { color: colors.text, fontWeight: '600' },
+  unreadBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    paddingHorizontal: 6,
+    backgroundColor: colors.primary,
     alignItems: 'center',
-    paddingHorizontal: 8,
-    marginLeft: 8,
+    justifyContent: 'center',
+    marginTop: 3,
   },
-  unreadCount: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  emptyState: {
-    alignItems: 'center',
-    marginTop: 100,
-    paddingHorizontal: 40,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 15,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.textDark,
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: colors.textLight,
-    textAlign: 'center',
-  },
-  quickActions: {
-    flexDirection: 'row',
-    backgroundColor: 'white',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    justifyContent: 'space-around',
-  },
-  quickActionButton: {
-    alignItems: 'center',
-  },
-  quickActionIcon: {
-    fontSize: 26,
-    marginBottom: 5,
-  },
-  quickActionLabel: {
-    fontSize: 11,
-    color: colors.textGray,
-    fontWeight: '500',
-  },
+  unreadText: { color: colors.white, fontSize: font.xs, fontWeight: '800' },
 });

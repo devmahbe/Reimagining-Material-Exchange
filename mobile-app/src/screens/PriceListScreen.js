@@ -1,432 +1,156 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { AppButton, AppHeader, BottomBar, Chip, EmptyState } from '../components/ui';
+import { getMaterialById, MATERIALS, PRICE_LIST } from '../constants/materials';
+import { getCurrentUserProfile } from '../services/userService';
+import { formatDateBangla, formatPriceRange } from '../utils/helpers';
 import colors from '../constants/colors';
+import { font, radius, spacing } from '../constants/theme';
+
+const TREND = {
+  up: { icon: 'trending-up', color: colors.success, label: 'বাড়ছে' },
+  down: { icon: 'trending-down', color: colors.error, label: 'কমছে' },
+  stable: { icon: 'remove', color: colors.textGray, label: 'স্থিতিশীল' },
+};
 
 export default function PriceListScreen({ navigation }) {
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [lastUpdated, setLastUpdated] = useState(() => {
-    const now = new Date();
-    return `আজ ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
-  });
+  const [category, setCategory] = useState('all');
+  const [search, setSearch] = useState('');
+  const [role, setRole] = useState(null);
+  const showRequestButton = role === 'household';
 
-  const categories = [
-    { id: 'all', name: 'সব', icon: '📦' },
-    { id: 'paper', name: 'কাগজ', icon: '📰' },
-    { id: 'plastic', name: 'প্লাস্টিক', icon: '🥤' },
-    { id: 'metal', name: 'ধাতু', icon: '🔧' },
-    { id: 'glass', name: 'কাচ', icon: '🍾' },
-    { id: 'electronics', name: 'ইলেকট্রনিক্স', icon: '📱' },
-    { id: 'clothes', name: 'কাপড়', icon: '👕' },
-  ];
+  useEffect(() => {
+    getCurrentUserProfile().then((p) => setRole(p?.role || null)).catch(() => {});
+  }, []);
 
-  const priceData = [
-    {
-      category: 'paper',
-      items: [
-        { name: 'সংবাদপত্র', price: '৳৮-১০/কেজি', quality: 'পরিষ্কার ও শুকনো', trend: 'up' },
-        { name: 'সাদা কাগজ', price: '৳১০-১২/কেজি', quality: 'প্রিন্ট ছাড়া', trend: 'up' },
-        { name: 'বই ও কপি', price: '৳৭-৯/কেজি', quality: 'যেকোনো অবস্থায়', trend: 'stable' },
-        { name: 'কার্টন বক্স', price: '৳৬-৮/কেজি', quality: 'সমতল করা', trend: 'down' },
-        { name: 'ম্যাগাজিন', price: '৳৫-৭/কেজি', quality: 'রঙিন কাগজ', trend: 'stable' },
-      ],
-    },
-    {
-      category: 'plastic',
-      items: [
-        { name: 'পানির বোতল (PET)', price: '৳২০-২৫/কেজি', quality: 'পরিষ্কার', trend: 'up' },
-        { name: 'প্লাস্টিক ব্যাগ', price: '৳১০-১৫/কেজি', quality: 'যেকোনো রঙ', trend: 'stable' },
-        { name: 'হার্ড প্লাস্টিক', price: '৳২৫-৩০/কেজি', quality: 'ভাঙা না', trend: 'up' },
-        { name: 'প্লাস্টিক পাত্র', price: '৳১৫-২০/কেজি', quality: 'পরিষ্কার', trend: 'stable' },
-        { name: 'পলিথিন', price: '৳৮-১২/কেজি', quality: 'মিশ্র', trend: 'down' },
-      ],
-    },
-    {
-      category: 'metal',
-      items: [
-        { name: 'লোহা', price: '৳৪০-৫০/কেজি', quality: 'জং ছাড়া', trend: 'up' },
-        { name: 'অ্যালুমিনিয়াম', price: '৳৮০-১০০/কেজি', quality: 'বিশুদ্ধ', trend: 'up' },
-        { name: 'তামা', price: '৳৪০০-৪৫০/কেজি', quality: 'বিশুদ্ধ', trend: 'up' },
-        { name: 'পিতল', price: '৳২৫০-৩০০/কেজি', quality: 'বিশুদ্ধ', trend: 'stable' },
-        { name: 'টিন', price: '৳৩০-৪০/কেজি', quality: 'যেকোনো', trend: 'stable' },
-        { name: 'স্টিল', price: '৳৪৫-৫৫/কেজি', quality: 'মরিচা ছাড়া', trend: 'up' },
-      ],
-    },
-    {
-      category: 'glass',
-      items: [
-        { name: 'কাচের বোতল', price: '৳৮-১০/কেজি', quality: 'ভাঙা না', trend: 'stable' },
-        { name: 'জানালার কাচ', price: '৳৫-৭/কেজি', quality: 'বড় টুকরা', trend: 'stable' },
-        { name: 'মিশ্র কাচ', price: '৩-৫/কেজি', quality: 'ভাঙা', trend: 'down' },
-      ],
-    },
-    {
-      category: 'electronics',
-      items: [
-        { name: 'মোবাইল ফোন', price: '৳৫০-২০০/পিস', quality: 'কাজ না করলেও', trend: 'up' },
-        { name: 'ল্যাপটপ', price: '৳৫০০-২০০০/পিস', quality: 'অবস্থা অনুসারে', trend: 'up' },
-        { name: 'ক্যাবল ও তার', price: '৳১০০-১৫০/কেজি', quality: 'তামার তার', trend: 'up' },
-        { name: 'সার্কিট বোর্ড', price: '৳২০০-৩০০/কেজি', quality: 'কম্পিউটার থেকে', trend: 'stable' },
-        { name: 'ব্যাটারি', price: '৳৫০-১০০/কেজি', quality: 'যেকোনো', trend: 'stable' },
-      ],
-    },
-    {
-      category: 'clothes',
-      items: [
-        { name: 'সুতি কাপড়', price: '৳১৫-২০/কেজি', quality: 'পরিষ্কার', trend: 'stable' },
-        { name: 'জিন্স', price: '৳১০-১৫/কেজি', quality: 'যেকোনো', trend: 'stable' },
-        { name: 'মিশ্র কাপড়', price: '৳৮-১২/কেজি', quality: 'পুরাতন', trend: 'down' },
-        { name: 'জুতা', price: '৳৫-১০/পেয়ার', quality: 'যেকোনো', trend: 'stable' },
-      ],
-    },
-  ];
-
-  const filteredData = selectedCategory === 'all' 
-    ? priceData 
-    : priceData.filter(item => item.category === selectedCategory);
-
-  const getTrendIcon = (trend) => {
-    if (trend === 'up') return '📈';
-    if (trend === 'down') return '📉';
-    return '➡️';
-  };
-
-  const getTrendColor = (trend) => {
-    if (trend === 'up') return '#4CAF50';
-    if (trend === 'down') return '#f44336';
-    return colors.textGray;
-  };
+  const term = search.trim();
+  const sections = PRICE_LIST.filter((s) => category === 'all' || s.category === category)
+    .map((s) => ({ ...s, items: s.items.filter((i) => !term || i.name.includes(term)) }))
+    .filter((s) => s.items.length > 0);
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <LinearGradient
-        colors={[colors.primary, colors.primaryLight]}
-        style={styles.header}
-      >
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>← ফিরুন</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>আজকের দর</Text>
-        <TouchableOpacity onPress={() => {
-          const now = new Date();
-          setLastUpdated(`আজ ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`);
-        }}>
-          <Text style={styles.refreshIcon}>🔄</Text>
-        </TouchableOpacity>
-      </LinearGradient>
+    <View style={styles.container}>
+      <AppHeader title="আজকের দর" subtitle={`বাজার দর • ${formatDateBangla(new Date())}`} onBack={() => navigation.goBack()}>
+        <View style={styles.search}>
+          <Ionicons name="search" size={18} color={colors.textGray} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="উপাদান খুঁজুন..."
+            placeholderTextColor={colors.textLight}
+            value={search}
+            onChangeText={setSearch}
+          />
+          {search ? (
+            <TouchableOpacity onPress={() => setSearch('')} hitSlop={8}>
+              <Ionicons name="close-circle" size={18} color={colors.textLight} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </AppHeader>
 
-      {/* Update Notice */}
-      <View style={styles.updateNotice}>
-        <Text style={styles.updateIcon}>⏰</Text>
-        <Text style={styles.updateText}>সর্বশেষ আপডেট: {lastUpdated}</Text>
+      <View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+          <Chip label="সব" active={category === 'all'} onPress={() => setCategory('all')} />
+          {MATERIALS.map((m) => (
+            <Chip key={m.id} label={m.name} active={category === m.id} onPress={() => setCategory(m.id)} />
+          ))}
+        </ScrollView>
       </View>
 
-      {/* Category Filter */}
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        style={styles.categoryFilter}
-        contentContainerStyle={styles.categoryFilterContent}
-      >
-        {categories.map((cat) => (
-          <TouchableOpacity
-            key={cat.id}
-            style={[
-              styles.categoryChip,
-              selectedCategory === cat.id && styles.categoryChipActive
-            ]}
-            onPress={() => setSelectedCategory(cat.id)}
-          >
-            <Text style={styles.categoryChipIcon}>{cat.icon}</Text>
-            <Text style={[
-              styles.categoryChipText,
-              selectedCategory === cat.id && styles.categoryChipTextActive
-            ]}>
-              {cat.name}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* Price List */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {filteredData.map((categoryData, index) => {
-          const category = categories.find(c => c.id === categoryData.category);
-          return (
-            <View key={index} style={styles.categorySection}>
-              <View style={styles.categorySectionHeader}>
-                <Text style={styles.categorySectionIcon}>{category?.icon}</Text>
-                <Text style={styles.categorySectionTitle}>{category?.name}</Text>
-              </View>
-
-              {categoryData.items.map((item, itemIndex) => (
-                <View key={itemIndex} style={styles.priceCard}>
-                  <View style={styles.priceCardLeft}>
-                    <Text style={styles.itemName}>{item.name}</Text>
-                    <Text style={styles.itemQuality}>• {item.quality}</Text>
+      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+        {sections.length === 0 ? (
+          <EmptyState icon="search-outline" title="কিছু পাওয়া যায়নি" message="অন্য নাম দিয়ে খুঁজে দেখুন" />
+        ) : (
+          sections.map((section) => {
+            const mat = getMaterialById(section.category);
+            return (
+              <View key={section.category} style={styles.section}>
+                <View style={styles.sectionHead}>
+                  <View style={[styles.sectionIcon, { backgroundColor: mat.bg }]}>
+                    <MaterialCommunityIcons name={mat.icon} size={20} color={mat.color} />
                   </View>
-
-                  <View style={styles.priceCardRight}>
-                    <View style={styles.priceRow}>
-                      <Text style={styles.itemPrice}>{item.price}</Text>
-                      <Text style={[styles.trendIcon, { color: getTrendColor(item.trend) }]}>
-                        {getTrendIcon(item.trend)}
-                      </Text>
-                    </View>
-                  </View>
+                  <Text style={styles.sectionTitle}>{mat.name}</Text>
                 </View>
-              ))}
-            </View>
-          );
-        })}
+                <View style={styles.card}>
+                  {section.items.map((item, i) => {
+                    const trend = TREND[item.trend] || TREND.stable;
+                    return (
+                      <View key={item.name} style={[styles.row, i === section.items.length - 1 && { borderBottomWidth: 0 }]}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.itemName}>{item.name}</Text>
+                          <Text style={styles.itemQuality}>{item.quality}</Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={styles.itemPrice}>
+                            {formatPriceRange(item)}
+                            <Text style={styles.itemUnit}> /{item.unit}</Text>
+                          </Text>
+                          <View style={styles.trend}>
+                            <Ionicons name={trend.icon} size={13} color={trend.color} />
+                            <Text style={[styles.trendText, { color: trend.color }]}>{trend.label}</Text>
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            );
+          })
+        )}
 
-        {/* Info Box */}
-        <View style={styles.infoBox}>
-          <Text style={styles.infoIcon}>ℹ️</Text>
-          <View style={styles.infoContent}>
-            <Text style={styles.infoTitle}>দর পরিবর্তনশীল</Text>
-            <Text style={styles.infoText}>
-              উপাদানের মান, পরিমাণ এবং বাজার অবস্থার উপর ভিত্তি করে দাম পরিবর্তন হতে পারে। সঠিক দাম জানতে সংগ্রাহকের সাথে যোগাযোগ করুন।
-            </Text>
-          </View>
+        <View style={styles.info}>
+          <Ionicons name="information-circle-outline" size={20} color={colors.info} />
+          <Text style={styles.infoText}>
+            দাম উপাদানের মান, পরিমাণ ও বাজার অবস্থার উপর নির্ভর করে। চূড়ান্ত দাম সংগ্রাহক পিকআপের সময় ওজন করে নির্ধারণ করবেন।
+          </Text>
         </View>
-
-        {/* Legend */}
-        <View style={styles.legend}>
-          <Text style={styles.legendTitle}>প্রবণতা চিহ্ন:</Text>
-          <View style={styles.legendItems}>
-            <View style={styles.legendItem}>
-              <Text style={styles.legendIcon}>📈</Text>
-              <Text style={styles.legendText}>দাম বাড়ছে</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <Text style={styles.legendIcon}>➡️</Text>
-              <Text style={styles.legendText}>স্থিতিশীল</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <Text style={styles.legendIcon}>📉</Text>
-              <Text style={styles.legendText}>দাম কমছে</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={{ height: 30 }} />
       </ScrollView>
-    </SafeAreaView>
+
+      {showRequestButton ? (
+        <BottomBar>
+          <AppButton title="পিকআপ অনুরোধ করুন" icon="add-circle-outline" onPress={() => navigation.navigate('MaterialSelection', category !== 'all' ? { preselect: category } : undefined)} />
+        </BottomBar>
+      ) : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgCream,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-  },
-  backButton: {
-    fontSize: 16,
-    color: 'white',
-    fontWeight: '600',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: 'white',
-  },
-  refreshIcon: {
-    fontSize: 20,
-  },
-  updateNotice: {
+  container: { flex: 1, backgroundColor: colors.background },
+  search: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFF3E0',
-    paddingVertical: 8,
-    paddingHorizontal: 15,
+    gap: spacing.sm,
+    backgroundColor: colors.white,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    minHeight: 46,
+    marginTop: spacing.lg,
   },
-  updateIcon: {
-    fontSize: 14,
-    marginRight: 8,
-  },
-  updateText: {
-    fontSize: 12,
-    color: colors.secondary,
-    fontWeight: '600',
-  },
-  categoryFilter: {
-    maxHeight: 60,
-    backgroundColor: 'white',
+  searchInput: { flex: 1, fontSize: font.md, color: colors.text, paddingVertical: spacing.sm },
+  chips: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.sm },
+  body: { padding: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.xxl },
+  section: { marginTop: spacing.md },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+  sectionIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  sectionTitle: { fontSize: font.lg, fontWeight: '700', color: colors.text },
+  card: { backgroundColor: colors.white, borderRadius: radius.lg, paddingHorizontal: spacing.lg },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.borderLight,
+    gap: spacing.md,
   },
-  categoryFilterContent: {
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    gap: 10,
-  },
-  categoryChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: colors.bgCream,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  categoryChipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  categoryChipIcon: {
-    fontSize: 16,
-    marginRight: 6,
-  },
-  categoryChipText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textDark,
-  },
-  categoryChipTextActive: {
-    color: 'white',
-  },
-  content: {
-    flex: 1,
-  },
-  categorySection: {
-    marginTop: 20,
-    marginHorizontal: 15,
-  },
-  categorySectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  categorySectionIcon: {
-    fontSize: 24,
-    marginRight: 10,
-  },
-  categorySectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.textDark,
-  },
-  priceCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  priceCardLeft: {
-    flex: 1,
-  },
-  itemName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.textDark,
-    marginBottom: 4,
-  },
-  itemQuality: {
-    fontSize: 12,
-    color: colors.textGray,
-  },
-  priceCardRight: {
-    justifyContent: 'center',
-    alignItems: 'flex-end',
-  },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  itemPrice: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.primary,
-    marginRight: 8,
-  },
-  trendIcon: {
-    fontSize: 16,
-  },
-  infoBox: {
-    flexDirection: 'row',
-    backgroundColor: '#E3F2FD',
-    marginHorizontal: 15,
-    marginTop: 20,
-    padding: 15,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#2196F3',
-  },
-  infoIcon: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  infoContent: {
-    flex: 1,
-  },
-  infoTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1976D2',
-    marginBottom: 4,
-  },
-  infoText: {
-    fontSize: 12,
-    color: '#1565C0',
-    lineHeight: 18,
-  },
-  legend: {
-    backgroundColor: 'white',
-    marginHorizontal: 15,
-    marginTop: 15,
-    padding: 15,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  legendTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.textDark,
-    marginBottom: 10,
-  },
-  legendItems: {
-    gap: 8,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  legendIcon: {
-    fontSize: 16,
-    marginRight: 10,
-    width: 24,
-  },
-  legendText: {
-    fontSize: 13,
-    color: colors.textGray,
-  },
+  itemName: { fontSize: font.md, fontWeight: '600', color: colors.text },
+  itemQuality: { fontSize: font.xs + 1, color: colors.textGray, marginTop: 2 },
+  itemPrice: { fontSize: font.md, fontWeight: '800', color: colors.primary },
+  itemUnit: { fontSize: font.xs + 1, fontWeight: '500', color: colors.textGray },
+  trend: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
+  trendText: { fontSize: font.xs, fontWeight: '600' },
+  info: { flexDirection: 'row', gap: spacing.md, backgroundColor: colors.infoSoft, borderRadius: radius.lg, padding: spacing.lg, marginTop: spacing.xl },
+  infoText: { flex: 1, fontSize: font.sm, color: colors.textBody, lineHeight: 20 },
 });

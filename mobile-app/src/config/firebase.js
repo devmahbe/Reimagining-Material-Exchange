@@ -1,9 +1,11 @@
 import { Platform } from 'react-native';
-import { initializeApp } from 'firebase/app';
+import { getApps, initializeApp } from 'firebase/app';
 import {
+  browserPopupRedirectResolver,
+  browserSessionPersistence,
   getAuth,
-  initializeAuth,
   getReactNativePersistence,
+  initializeAuth,
   GoogleAuthProvider,
 } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
@@ -21,27 +23,75 @@ const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// ─── Multiple accounts on one device ──────────────────────────────────────────
+// Each signed-in account lives in its own Firebase app instance ("slot"), so
+// every account has its own saved session and its own Firestore connection.
+// The first slot is the default app, so existing logins keep working.
+export const ACCOUNT_SLOTS = ['[DEFAULT]', 'account-2', 'account-3'];
 
-// Initialize Firebase Auth.
+const slots = {};
+
+// Initialize Firebase Auth for one slot.
 // `getReactNativePersistence` is React Native only (not exported by the web
 // build of firebase/auth), so we must branch on platform:
 //   - Native (iOS/Android): persist with AsyncStorage
-//   - Web: use the default browser persistence via getAuth()
-export const auth = (() => {
-  if (Platform.OS === 'web') {
-    return getAuth(app);
+//   - Web: per-tab session storage, so each browser tab can be logged in
+//     to a different account at the same time
+const createAuth = (firebaseApp) => {
+  try {
+    if (Platform.OS === 'web') {
+      return initializeAuth(firebaseApp, {
+        persistence: browserSessionPersistence,
+        popupRedirectResolver: browserPopupRedirectResolver,
+      });
+    }
+    return initializeAuth(firebaseApp, {
+      persistence: getReactNativePersistence(AsyncStorage),
+    });
+  } catch (error) {
+    // Already initialized (e.g. after a fast refresh)
+    return getAuth(firebaseApp);
   }
-  return initializeAuth(app, {
-    persistence: getReactNativePersistence(AsyncStorage),
-  });
-})();
+};
 
-export const db = getFirestore(app);
-export const storage = getStorage(app);
+const createSlot = (name) => {
+  const existing = getApps().find((a) => a.name === name);
+  const firebaseApp =
+    existing || (name === ACCOUNT_SLOTS[0] ? initializeApp(firebaseConfig) : initializeApp(firebaseConfig, name));
+  return {
+    name,
+    app: firebaseApp,
+    auth: createAuth(firebaseApp),
+    db: getFirestore(firebaseApp),
+    storage: getStorage(firebaseApp),
+  };
+};
+
+export const getSlot = (name) => {
+  if (!slots[name]) slots[name] = createSlot(name);
+  return slots[name];
+};
+
+// These are live bindings: modules that import them always see the
+// currently active account after `setActiveSlot` is called.
+export let auth;
+export let db;
+export let storage;
+let activeSlotName = ACCOUNT_SLOTS[0];
+
+export const setActiveSlot = (name) => {
+  const slot = getSlot(name);
+  activeSlotName = name;
+  auth = slot.auth;
+  db = slot.db;
+  storage = slot.storage;
+};
+
+export const getActiveSlotName = () => activeSlotName;
+
+setActiveSlot(ACCOUNT_SLOTS[0]);
 
 // Google Sign-In provider (web only)
 export const googleProvider = new GoogleAuthProvider();
 
-export default app;
+export default getSlot(ACCOUNT_SLOTS[0]).app;

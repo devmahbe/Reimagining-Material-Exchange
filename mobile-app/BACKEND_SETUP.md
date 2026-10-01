@@ -3,49 +3,40 @@
 This folder contains the repeatable Firebase backend configuration for the mobile app.
 No custom server is needed — the app talks to Firebase directly.
 
-The `.env` file holds your Firebase credentials (`EXPO_PUBLIC_FIREBASE_*`). It is gitignored,e so you must create it on every machine (copy `.env.example` → `.env`, fill real values from Firebase Console → Project Settings → Your Apps).
+The `.env` file holds your Firebase credentials (`EXPO_PUBLIC_FIREBASE_*`). It is gitignored, so you must create it on every machine (copy `.env.example` → `.env`, fill real values from Firebase Console → Project Settings → Your Apps).
 
 ## What each file does
 | File | Purpose |
 |------|---------|
 | `firebase.json` | Points the Firebase CLI at the rules/index files below |
-| `firestore.rules` | Security rules for users, pickupRequests, messages, reviews |
-| `firestore.indexes.json` | Composite indexes required by the app's queries (mandatory) |
+| `firestore.rules` | Security rules for users, pickupRequests, messages, reviews, payments |
+| `firestore.indexes.json` | Optional composite indexes (the app's queries no longer require any) |
 | `storage.rules` | Rules for photo uploads (namespaced under each user's UID) |
 
-## One-time setup in Firebase Console
-1. Create/open your Firebase project (e.g. `bhangari-exchange`)ango Console → Project settings → Your Apps → add a **Web app** → copy the config into `.env`.
-2. **Authentication** → Sign-in method → enable **Email/Password** and **Google**.
-3. **Firestore** → Create database. Set the security rules (see below)or use Test mode during development.
-4. **Storage** → Get started. Set the rules (see below).
-5. **Firestore → Indexes** → the app needs composite indexes or queries fail with "requires an index". Deploy them with the CLI(below)or create them manually per `firestore.indexes.json`.
+## Collections
+| Collection | Written by | Notes |
+|------------|-----------|-------|
+| `users/{uid}` | the user | `role` is `household` or `collector` and can't be changed later |
+| `pickupRequests/{id}` | household creates; collector accepts/updates | status: `pending → accepted → on-the-way → at-location → completed` (household may `cancelled` while pending/accepted) |
+| `messages/{id}` | sender | readable only by sender and recipient |
+| `reviews/{pickupId}` | household | one review per completed pickup; collector rating = average of their reviews |
+| `payments/{id}` | assigned collector | **demo** payments (cash / mobile wallet / bank) — no external payment API is called |
 
-## Option A: Deploy config with Firebase CLI (recommended reagent re-run)
+## One-time setup in Firebase Console
+1. Create/open your Firebase project → Project settings → Your Apps → add a **Web app** → copy the config into `.env`.
+2. **Authentication** → Sign-in method → enable **Email/Password** and **Google**.
+3. **Firestore** → Create database, then deploy the security rules (below).
+4. **Storage** → Get started, then deploy the storage rules (below).
+
+## Option A: Deploy with the Firebase CLI (recommended)
 ```bash
 cd mobile-app
-npm install -g firebase-tools      # once/global
-firebase login
-firebase use --add                    # pick the project
-firebase deploy --only firestore:rules
-firebase deploy --only firestore:indexes
-firebase deploy --only storage
+npm install -g firebase-tools        # once
+firebase login                       # once
+firebase deploy --only firestore:rules,storage --project <your-project-id>
 ```
-(You can also run plain `firebase deploy` to push all supported ruless/indexes.)
 
 ## Option B: Manual (no CLI)
-Paste the contents of `firestore.rules` into Firestore → Rules,and `firestore.indexes.json` into the composite-index creation flow (or create each index by hand as listed in the file). Paste `storage.rules` into Storage → Rules.
+Paste the contents of `firestore.rules` into Firestore → Rules, and `storage.rules` into Storage → Rules, then click **Publish**.
 
-
-
-## Required Firestore indexes (summary)
-- `pickupRequests`: `status` ASC + `createdAt` DESC
-- `pickupRequests`: `userId` ASC + `createdAt` DESC
-- `pickupRequests`: `collectorId` ASC + `createdAt` DESC
-- `pickupRequests`: `collectorId` ASC + `completedAt` DESC
-- `pickupRequests`: `collectorId` ASC + `status` ASC
-- `pickupRequests`: `collectorId` ASC + `status` ASC + `completedAt` DESC
-- `messages`: `conversationId` ASC + `createdAt` ASC
-- `messages`: `senderId` ASC + `createdAt` DESC
-- `messages`: `recipientId` ASC + `createdAt` DESC
-
-> Note: images upload via `src/utils/helpers.js` are stored under `pickups/<uid>/<file>` so`storage.rules` can restrict a user to their own files.
+> Images uploaded via `src/utils/helpers.js` are stored under `pickups/<uid>/<file>` so `storage.rules` can restrict a user to their own files.

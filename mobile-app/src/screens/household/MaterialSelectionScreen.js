@@ -1,440 +1,257 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  Alert,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert } from '../../utils/alert';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { AppButton, AppHeader, BottomBar, Card, SectionHeader } from '../../components/ui';
+import { MATERIALS } from '../../constants/materials';
+import { calculateEarnings, formatPriceRange, formatTaka, toBnDigits } from '../../utils/helpers';
 import colors from '../../constants/colors';
-import banglaText from '../../constants/banglaText';
+import { font, radius, spacing } from '../../constants/theme';
 
-export default function MaterialSelectionScreen({ navigation }) {
-  const [selectedMaterials, setSelectedMaterials] = useState([]);
+const MAX_PHOTOS = 5;
+
+export default function MaterialSelectionScreen({ navigation, route }) {
+  const preselect = route.params?.preselect;
+  const [selected, setSelected] = useState(() => {
+    const m = MATERIALS.find((x) => x.id === preselect);
+    return m ? { [m.id]: 1 } : {};
+  });
   const [images, setImages] = useState([]);
 
-  const materials = [
-    { id: 1, name: 'কাগজ', icon: '📰', price: '৳৮-১২', unit: 'কেজি' },
-    { id: 2, name: 'প্লাস্টিক', icon: '🥤', price: '৳১৫-২৫', unit: 'কেজি' },
-    { id: 3, name: 'ধাতু', icon: '🔧', price: '৳৪০-৬০', unit: 'কেজি' },
-    { id: 4, name: 'কাচ', icon: '🍾', price: '৳৫-১০', unit: 'কেজি' },
-    { id: 5, name: 'ইলেকট্রনিক্স', icon: '📱', price: '৳৫০+', unit: 'পিস' },
-    { id: 6, name: 'কাপড়', icon: '👕', price: '৳১০-২০', unit: 'কেজি' },
-  ];
+  const setQuantity = (id, qty) =>
+    setSelected((prev) => {
+      const next = { ...prev };
+      if (qty <= 0) delete next[id];
+      else next[id] = Math.min(qty, 999);
+      return next;
+    });
 
-  const toggleMaterial = (material) => {
-    const exists = selectedMaterials.find(m => m.id === material.id);
-    
-    if (exists) {
-      setSelectedMaterials(selectedMaterials.filter(m => m.id !== material.id));
-    } else {
-      setSelectedMaterials([...selectedMaterials, { ...material, quantity: 1 }]);
-    }
-  };
+  const selectedMaterials = MATERIALS.filter((m) => selected[m.id]).map((m) => ({ ...m, quantity: selected[m.id] }));
+  const estimate = calculateEarnings(selectedMaterials);
 
-  const updateQuantity = (materialId, change) => {
-    setSelectedMaterials(selectedMaterials.map(m => {
-      if (m.id === materialId) {
-        const newQty = Math.max(1, m.quantity + change);
-        return { ...m, quantity: newQty };
-      }
-      return m;
-    }));
+  const addAssets = (assets) => {
+    const uris = (assets || []).map((a) => a.uri);
+    setImages((prev) => [...prev, ...uris].slice(0, MAX_PHOTOS));
   };
 
   const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
-    if (status !== 'granted') {
-      Alert.alert('অনুমতি প্রয়োজন', 'ছবি নির্বাচন করতে অনুমতি দিন');
+    if (images.length >= MAX_PHOTOS) {
+      Alert.alert('সর্বোচ্চ ছবি', `সর্বোচ্চ ${toBnDigits(MAX_PHOTOS)}টি ছবি যোগ করা যাবে`);
       return;
     }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      setImages([...images, result.assets[0].uri]);
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('অনুমতি প্রয়োজন', 'ছবি নির্বাচন করতে গ্যালারির অনুমতি দিন');
+      return;
     }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      selectionLimit: MAX_PHOTOS - images.length,
+      quality: 0.6,
+    });
+    if (!result.canceled) addAssets(result.assets);
   };
 
   const takePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    
-    if (status !== 'granted') {
-      Alert.alert('অনুমতি প্রয়োজন', 'ক্যামেরা ব্যবহার করতে অনুমতি দিন');
+    if (images.length >= MAX_PHOTOS) {
+      Alert.alert('সর্বোচ্চ ছবি', `সর্বোচ্চ ${toBnDigits(MAX_PHOTOS)}টি ছবি যোগ করা যাবে`);
       return;
     }
-
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      setImages([...images, result.assets[0].uri]);
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('অনুমতি প্রয়োজন', 'ছবি তুলতে ক্যামেরার অনুমতি দিন');
+      return;
     }
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.6 });
+    if (!result.canceled) addAssets(result.assets);
   };
 
   const handleContinue = () => {
     if (selectedMaterials.length === 0) {
-      Alert.alert('সতর্কতা', 'অনুগ্রহ করে অন্তত একটি উপাদান নির্বাচন করুন');
+      Alert.alert('উপাদান নির্বাচন করুন', 'অন্তত একটি উপাদান নির্বাচন করুন');
       return;
     }
-
-    navigation.navigate('SchedulePickup', { 
-      materials: selectedMaterials,
-      images: images 
-    });
-  };
-
-  const getTotalEstimate = () => {
-    let total = 0;
-    selectedMaterials.forEach(m => {
-      const avgPrice = parseInt(m.price.match(/\d+/)[0]);
-      total += avgPrice * m.quantity;
-    });
-    return total;
+    navigation.navigate('SchedulePickup', { materials: selectedMaterials, images });
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <LinearGradient
-        colors={[colors.primary, colors.primaryLight]}
-        style={styles.header}
-      >
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>← ফিরুন</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>উপাদান নির্বাচন করুন</Text>
-        <View style={{ width: 60 }} />
-      </LinearGradient>
+    <View style={styles.container}>
+      <AppHeader title="উপাদান নির্বাচন" subtitle="ধাপ ১/৩ — কী বিক্রি করবেন?" onBack={() => navigation.goBack()} />
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Instructions */}
-        <View style={styles.instructionCard}>
-          <Text style={styles.instructionText}>
-            আপনার বিক্রয় করতে চান এমন উপাদান নির্বাচন করুন
-          </Text>
+      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+        <View style={styles.tip}>
+          <Ionicons name="information-circle-outline" size={18} color={colors.info} />
+          <Text style={styles.tipText}>পরিমাণ আনুমানিক দিন — সংগ্রাহক পিকআপের সময় ওজন করে দাম ঠিক করবেন।</Text>
         </View>
 
-        {/* Material Grid */}
-        <View style={styles.materialGrid}>
-          {materials.map((material) => {
-            const isSelected = selectedMaterials.find(m => m.id === material.id);
-            
-            return (
-              <TouchableOpacity
-                key={material.id}
-                style={[
-                  styles.materialCard,
-                  isSelected && styles.materialCardSelected
-                ]}
-                onPress={() => toggleMaterial(material)}
-              >
-                <Text style={styles.materialIcon}>{material.icon}</Text>
-                <Text style={styles.materialName}>{material.name}</Text>
-                <Text style={styles.materialPrice}>{material.price}/{material.unit}</Text>
-                
-                {isSelected && (
-                  <View style={styles.quantityControl}>
-                    <TouchableOpacity
-                      style={styles.qtyButton}
-                      onPress={() => updateQuantity(material.id, -1)}
-                    >
-                      <Text style={styles.qtyButtonText}>−</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.qtyValue}>{isSelected.quantity}</Text>
-                    <TouchableOpacity
-                      style={styles.qtyButton}
-                      onPress={() => updateQuantity(material.id, 1)}
-                    >
-                      <Text style={styles.qtyButtonText}>+</Text>
-                    </TouchableOpacity>
+        {MATERIALS.map((m) => {
+          const qty = selected[m.id] || 0;
+          const isSelected = qty > 0;
+          return (
+            <View key={m.id} style={[styles.row, isSelected && styles.rowSelected]}>
+              <View style={[styles.rowIcon, { backgroundColor: m.bg }]}>
+                <MaterialCommunityIcons name={m.icon} size={26} color={m.color} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowName}>{m.name}</Text>
+                <Text style={styles.rowPrice}>{formatPriceRange(m)} / {m.unit}</Text>
+              </View>
+              {isSelected ? (
+                <View style={styles.stepper}>
+                  <TouchableOpacity style={styles.stepBtn} onPress={() => setQuantity(m.id, qty - 1)} accessibilityLabel="কমান">
+                    <Ionicons name={qty === 1 ? 'trash-outline' : 'remove'} size={18} color={colors.primary} />
+                  </TouchableOpacity>
+                  <View style={styles.qtyBox}>
+                    <Text style={styles.qtyText}>{toBnDigits(qty)}</Text>
+                    <Text style={styles.qtyUnit}>{m.unit}</Text>
                   </View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* Photo Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📷 ছবি যোগ করুন (ঐচ্ছিক)</Text>
-          <Text style={styles.sectionSubtitle}>
-            স্পষ্ট মূল্যায়নের জন্য উপাদানের ছবি তুলুন
-          </Text>
-
-          <View style={styles.photoButtons}>
-            <TouchableOpacity style={styles.photoButton} onPress={takePhoto}>
-              <Text style={styles.photoButtonIcon}>📸</Text>
-              <Text style={styles.photoButtonText}>ক্যামেরা</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.photoButton} onPress={pickImage}>
-              <Text style={styles.photoButtonIcon}>🖼️</Text>
-              <Text style={styles.photoButtonText}>গ্যালারি</Text>
-            </TouchableOpacity>
-          </View>
-
-          {images.length > 0 && (
-            <View style={styles.imagePreview}>
-              <Text style={styles.imageCount}>
-                ✅ {images.length} টি ছবি যোগ করা হয়েছে
-              </Text>
+                  <TouchableOpacity style={styles.stepBtn} onPress={() => setQuantity(m.id, qty + 1)} accessibilityLabel="বাড়ান">
+                    <Ionicons name="add" size={18} color={colors.primary} />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.addBtn} onPress={() => setQuantity(m.id, 1)}>
+                  <Ionicons name="add" size={16} color={colors.white} />
+                  <Text style={styles.addText}>যোগ</Text>
+                </TouchableOpacity>
+              )}
             </View>
-          )}
-        </View>
+          );
+        })}
 
-        {/* Estimate */}
-        {selectedMaterials.length > 0 && (
-          <View style={styles.estimateCard}>
-            <Text style={styles.estimateLabel}>আনুমানিক মূল্য</Text>
-            <Text style={styles.estimateAmount}>৳{getTotalEstimate()}</Text>
-            <Text style={styles.estimateNote}>
-              * প্রকৃত মূল্য পরিদর্শনের পর নির্ধারিত হবে
-            </Text>
+        <SectionHeader title="ছবি যোগ করুন (ঐচ্ছিক)" />
+        <Card>
+          <Text style={styles.photoHint}>স্পষ্ট ছবি দিলে সংগ্রাহক সহজে মূল্যায়ন করতে পারবেন</Text>
+          <View style={styles.photoRow}>
+            {images.map((uri, i) => (
+              <View key={uri + i} style={styles.thumbWrap}>
+                <Image source={{ uri }} style={styles.thumb} />
+                <TouchableOpacity
+                  style={styles.thumbRemove}
+                  onPress={() => setImages((prev) => prev.filter((_, idx) => idx !== i))}
+                  hitSlop={8}
+                  accessibilityLabel="ছবি মুছুন"
+                >
+                  <Ionicons name="close" size={14} color={colors.white} />
+                </TouchableOpacity>
+              </View>
+            ))}
+            {images.length < MAX_PHOTOS ? (
+              <>
+                <TouchableOpacity style={styles.photoBtn} onPress={takePhoto}>
+                  <Ionicons name="camera-outline" size={24} color={colors.primary} />
+                  <Text style={styles.photoBtnText}>ক্যামেরা</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.photoBtn} onPress={pickImage}>
+                  <Ionicons name="images-outline" size={24} color={colors.primary} />
+                  <Text style={styles.photoBtnText}>গ্যালারি</Text>
+                </TouchableOpacity>
+              </>
+            ) : null}
           </View>
-        )}
-
-        <View style={{ height: 100 }} />
+        </Card>
       </ScrollView>
 
-      {/* Bottom Button */}
-      {selectedMaterials.length > 0 && (
-        <View style={styles.bottomContainer}>
-          <TouchableOpacity style={styles.continueButton} onPress={handleContinue}>
-            <LinearGradient
-              colors={[colors.secondary, colors.secondaryLight]}
-              style={styles.continueButtonGradient}
-            >
-              <Text style={styles.continueButtonText}>
-                পরবর্তী: সময়সূচী নির্ধারণ →
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
+      <BottomBar>
+        <View style={styles.footerRow}>
+          <View>
+            <Text style={styles.footerLabel}>
+              {selectedMaterials.length > 0 ? `${toBnDigits(selectedMaterials.length)}টি উপাদান • আনুমানিক` : 'কোনো উপাদান নির্বাচিত নয়'}
+            </Text>
+            <Text style={styles.footerAmount}>{formatTaka(estimate)}</Text>
+          </View>
+          <AppButton
+            title="পরবর্তী"
+            icon="arrow-forward"
+            onPress={handleContinue}
+            disabled={selectedMaterials.length === 0}
+            style={{ paddingHorizontal: spacing.xxl }}
+          />
         </View>
-      )}
-    </SafeAreaView>
+      </BottomBar>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgCream,
-  },
-  header: {
+  container: { flex: 1, backgroundColor: colors.background },
+  body: { padding: spacing.lg, paddingBottom: spacing.xxl },
+  tip: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
+    gap: spacing.sm,
+    backgroundColor: colors.infoSoft,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
   },
-  backButton: {
-    fontSize: 16,
-    color: 'white',
-    fontWeight: '600',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: 'white',
-  },
-  content: {
-    flex: 1,
-  },
-  instructionCard: {
-    backgroundColor: 'rgba(46, 125, 50, 0.1)',
-    margin: 20,
-    padding: 15,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.primary,
-  },
-  instructionText: {
-    fontSize: 14,
-    color: colors.textDark,
-    textAlign: 'center',
-  },
-  materialGrid: {
+  tipText: { flex: 1, fontSize: font.sm, color: colors.textBody, lineHeight: 19 },
+  row: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 15,
-    gap: 15,
-  },
-  materialCard: {
-    width: '47%',
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    gap: spacing.md,
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
     borderWidth: 2,
     borderColor: 'transparent',
   },
-  materialCardSelected: {
-    borderColor: colors.primary,
-    backgroundColor: 'rgba(46, 125, 50, 0.05)',
-  },
-  materialIcon: {
-    fontSize: 40,
-    marginBottom: 10,
-  },
-  materialName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textDark,
-    marginBottom: 5,
-  },
-  materialPrice: {
-    fontSize: 12,
-    color: colors.primary,
-    fontWeight: '600',
-    marginBottom: 10,
-  },
-  quantityControl: {
+  rowSelected: { borderColor: colors.primary, backgroundColor: '#FBFEFC' },
+  rowIcon: { width: 50, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  rowName: { fontSize: font.md + 1, fontWeight: '700', color: colors.text },
+  rowPrice: { fontSize: font.sm, color: colors.textGray, marginTop: 2 },
+  addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 15,
-    marginTop: 10,
-    backgroundColor: colors.bgCream,
-    borderRadius: 20,
-    padding: 5,
-  },
-  qtyButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    gap: 4,
     backgroundColor: colors.primary,
+    paddingHorizontal: spacing.lg,
+    height: 40,
+    borderRadius: radius.pill,
+  },
+  addText: { color: colors.white, fontWeight: '700', fontSize: font.sm },
+  stepper: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  stepBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
     justifyContent: 'center',
+  },
+  qtyBox: { minWidth: 40, alignItems: 'center' },
+  qtyText: { fontSize: font.lg, fontWeight: '800', color: colors.text },
+  qtyUnit: { fontSize: font.xs, color: colors.textGray },
+  photoHint: { fontSize: font.sm, color: colors.textGray, marginBottom: spacing.md },
+  photoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
+  thumbWrap: { width: 76, height: 76 },
+  thumb: { width: 76, height: 76, borderRadius: radius.md, backgroundColor: colors.surface },
+  thumbRemove: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.error,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  qtyButtonText: {
-    color: 'white',
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  qtyValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.textDark,
-    minWidth: 30,
-    textAlign: 'center',
-  },
-  section: {
-    padding: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.textDark,
-    marginBottom: 5,
-  },
-  sectionSubtitle: {
-    fontSize: 13,
-    color: colors.textGray,
-    marginBottom: 15,
-  },
-  photoButtons: {
-    flexDirection: 'row',
-    gap: 15,
-  },
-  photoButton: {
-    flex: 1,
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: colors.border,
+  photoBtn: {
+    width: 76,
+    height: 76,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
     borderStyle: 'dashed',
-  },
-  photoButtonIcon: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
-  photoButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textDark,
-  },
-  imagePreview: {
-    marginTop: 15,
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
-    padding: 15,
-    borderRadius: 12,
-  },
-  imageCount: {
-    fontSize: 14,
-    color: colors.success,
-    textAlign: 'center',
-    fontWeight: '600',
-  },
-  estimateCard: {
-    backgroundColor: 'white',
-    margin: 20,
-    padding: 20,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    borderColor: colors.primaryLight,
+    backgroundColor: colors.primarySoft,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  estimateLabel: {
-    fontSize: 14,
-    color: colors.textGray,
-    marginBottom: 8,
-  },
-  estimateAmount: {
-    fontSize: 36,
-    fontWeight: '700',
-    color: colors.primary,
-    marginBottom: 8,
-  },
-  estimateNote: {
-    fontSize: 12,
-    color: colors.textLight,
-    textAlign: 'center',
-  },
-  bottomContainer: {
-    padding: 20,
-    backgroundColor: 'white',
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  continueButton: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: colors.secondary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  continueButtonGradient: {
-    padding: 18,
-    alignItems: 'center',
-  },
-  continueButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  photoBtnText: { fontSize: font.xs, color: colors.primary, marginTop: 4, fontWeight: '600' },
+  footerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  footerLabel: { fontSize: font.xs + 1, color: colors.textGray },
+  footerAmount: { fontSize: font.xxl, fontWeight: '800', color: colors.primary },
 });
